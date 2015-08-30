@@ -1,18 +1,14 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Validation;
 
 namespace System.Collections.Immutable
 {
     /// <summary>
-    /// A thin wrapper around the Keys or Values enumerators so they look like a collection.
+    /// A thin wrapper around the <see cref="IDictionary{TKey, TValue}.Keys"/> or <see cref="IDictionary{TKey, TValue}.Values"/> enumerators so they look like a collection.
     /// </summary>
     /// <typeparam name="TKey">The type of key in the dictionary.</typeparam>
     /// <typeparam name="TValue">The type of value in the dictionary.</typeparam>
@@ -22,12 +18,12 @@ namespace System.Collections.Immutable
         /// <summary>
         /// The underlying wrapped dictionary.
         /// </summary>
-        private readonly IImmutableDictionary<TKey, TValue> dictionary;
+        private readonly IImmutableDictionary<TKey, TValue> _dictionary;
 
         /// <summary>
         /// The key or value enumerable that this instance wraps.
         /// </summary>
-        private readonly IEnumerable<T> keysOrValues;
+        private readonly IEnumerable<T> _keysOrValues;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="KeysOrValuesCollectionAccessor{TKey, TValue, T}"/> class.
@@ -39,12 +35,12 @@ namespace System.Collections.Immutable
             Requires.NotNull(dictionary, "dictionary");
             Requires.NotNull(keysOrValues, "keysOrValues");
 
-            this.dictionary = dictionary;
-            this.keysOrValues = keysOrValues;
+            _dictionary = dictionary;
+            _keysOrValues = keysOrValues;
         }
 
         /// <summary>
-        /// See <see cref="ICollection&lt;T&gt;"/>
+        /// See <see cref="ICollection{T}"/>
         /// </summary>
         public bool IsReadOnly
         {
@@ -52,12 +48,12 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// See <see cref="ICollection&lt;T&gt;"/>
+        /// See <see cref="ICollection{T}"/>
         /// </summary>
-        /// <returns>The number of elements contained in the <see cref="T:System.Collections.Generic.ICollection`1"/>.</returns>
+        /// <returns>The number of elements contained in the <see cref="ICollection{T}"/>.</returns>
         public int Count
         {
-            get { return this.dictionary.Count; }
+            get { return _dictionary.Count; }
         }
 
         /// <summary>
@@ -65,11 +61,11 @@ namespace System.Collections.Immutable
         /// </summary>
         protected IImmutableDictionary<TKey, TValue> Dictionary
         {
-            get { return this.dictionary; }
+            get { return _dictionary; }
         }
 
         /// <summary>
-        /// See <see cref="ICollection&lt;T&gt;"/>
+        /// See <see cref="ICollection{T}"/>
         /// </summary>
         public void Add(T item)
         {
@@ -77,7 +73,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// See <see cref="ICollection&lt;T&gt;"/>
+        /// See <see cref="ICollection{T}"/>
         /// </summary>
         public void Clear()
         {
@@ -85,12 +81,12 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// See <see cref="ICollection&lt;T&gt;"/>
+        /// See <see cref="ICollection{T}"/>
         /// </summary>
         public abstract bool Contains(T item);
 
         /// <summary>
-        /// See <see cref="ICollection&lt;T&gt;"/>
+        /// See <see cref="ICollection{T}"/>
         /// </summary>
         public void CopyTo(T[] array, int arrayIndex)
         {
@@ -105,7 +101,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// See <see cref="ICollection&lt;T&gt;"/>
+        /// See <see cref="ICollection{T}"/>
         /// </summary>
         public bool Remove(T item)
         {
@@ -113,11 +109,11 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// See <see cref="IEnumerable&lt;T&gt;"/>
+        /// See <see cref="IEnumerable{T}"/>
         /// </summary>
         public IEnumerator<T> GetEnumerator()
         {
-            return this.keysOrValues.GetEnumerator();
+            return _keysOrValues.GetEnumerator();
         }
 
         /// <summary>
@@ -129,33 +125,26 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Copies the elements of the <see cref="T:System.Collections.ICollection" /> to an <see cref="T:System.Array" />, starting at a particular <see cref="T:System.Array" /> index.
+        /// Copies the elements of the <see cref="ICollection"/> to an <see cref="Array"/>, starting at a particular <see cref="Array"/> index.
         /// </summary>
-        /// <param name="array">The one-dimensional <see cref="T:System.Array" /> that is the destination of the elements copied from <see cref="T:System.Collections.ICollection" />. The <see cref="T:System.Array" /> must have zero-based indexing.</param>
-        /// <param name="arrayIndex">The zero-based index in <paramref name="array" /> at which copying begins.</param>
+        /// <param name="array">The one-dimensional <see cref="Array"/> that is the destination of the elements copied from <see cref="ICollection"/>. The <see cref="Array"/> must have zero-based indexing.</param>
+        /// <param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param>
         void ICollection.CopyTo(Array array, int arrayIndex)
         {
             Requires.NotNull(array, "array");
             Requires.Range(arrayIndex >= 0, "arrayIndex");
             Requires.Range(array.Length >= arrayIndex + this.Count, "arrayIndex");
 
-            if (this.Count == 0)
-            {
-                return;
-            }
-
-            int[] indices = new int[1]; // SetValue takes a params array; lifting out the implicit allocation from the loop
             foreach (T item in this)
             {
-                indices[0] = arrayIndex++;
-                array.SetValue(item, indices);
+                array.SetValue(item, arrayIndex++);
             }
         }
 
         /// <summary>
-        /// Gets a value indicating whether access to the <see cref="T:System.Collections.ICollection" /> is synchronized (thread safe).
+        /// Gets a value indicating whether access to the <see cref="ICollection"/> is synchronized (thread safe).
         /// </summary>
-        /// <returns>true if access to the <see cref="T:System.Collections.ICollection" /> is synchronized (thread safe); otherwise, false.</returns>
+        /// <returns>true if access to the <see cref="ICollection"/> is synchronized (thread safe); otherwise, false.</returns>
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         bool ICollection.IsSynchronized
         {
@@ -163,9 +152,9 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Gets an object that can be used to synchronize access to the <see cref="T:System.Collections.ICollection" />.
+        /// Gets an object that can be used to synchronize access to the <see cref="ICollection"/>.
         /// </summary>
-        /// <returns>An object that can be used to synchronize access to the <see cref="T:System.Collections.ICollection" />.</returns>
+        /// <returns>An object that can be used to synchronize access to the <see cref="ICollection"/>.</returns>
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         object ICollection.SyncRoot
         {
@@ -187,7 +176,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// See <see cref="ICollection&lt;T&gt;"/>
+        /// See <see cref="ICollection{T}"/>
         /// </summary>
         public override bool Contains(TKey item)
         {
@@ -209,7 +198,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// See <see cref="ICollection&lt;T&gt;"/>
+        /// See <see cref="ICollection{T}"/>
         /// </summary>
         public override bool Contains(TValue item)
         {

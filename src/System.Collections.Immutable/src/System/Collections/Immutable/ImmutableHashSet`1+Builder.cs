@@ -1,21 +1,15 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Diagnostics.Contracts;
-using System.Linq;
-using System.Text;
 using Validation;
 
 namespace System.Collections.Immutable
 {
     /// <content>
-    /// Contains the inner Builder class.
+    /// Contains the inner <see cref="ImmutableHashSet{T}.Builder"/> class.
     /// </content>
     [SuppressMessage("Microsoft.Naming", "CA1710:IdentifiersShouldHaveCorrectSuffix", Justification = "Ignored")]
     public sealed partial class ImmutableHashSet<T>
@@ -26,7 +20,7 @@ namespace System.Collections.Immutable
         /// </summary>
         /// <remarks>
         /// <para>
-        /// While <see cref="ImmutableHashSet&lt;T&gt;.Union(IEnumerable&lt;T&gt;)"/> and other bulk change methods
+        /// While <see cref="ImmutableHashSet{T}.Union(IEnumerable{T})"/> and other bulk change methods
         /// already provide fast bulk change operations on the collection, this class allows
         /// multiple combinations of changes to be made to a set with equal efficiency.
         /// </para>
@@ -42,57 +36,57 @@ namespace System.Collections.Immutable
             /// <summary>
             /// The root of the binary tree that stores the collection.  Contents are typically not entirely frozen.
             /// </summary>
-            private ImmutableSortedDictionary<int, HashBucket>.Node root = ImmutableSortedDictionary<int, HashBucket>.Node.EmptyNode;
+            private SortedInt32KeyNode<HashBucket> _root = SortedInt32KeyNode<HashBucket>.EmptyNode;
 
             /// <summary>
             /// The equality comparer.
             /// </summary>
-            private IEqualityComparer<T> equalityComparer;
+            private IEqualityComparer<T> _equalityComparer;
 
             /// <summary>
             /// The number of elements in this collection.
             /// </summary>
-            private int count;
+            private int _count;
 
             /// <summary>
             /// Caches an immutable instance that represents the current state of the collection.
             /// </summary>
             /// <value>Null if no immutable view has been created for the current version.</value>
-            private ImmutableHashSet<T> immutable;
+            private ImmutableHashSet<T> _immutable;
 
             /// <summary>
             /// A number that increments every time the builder changes its contents.
             /// </summary>
-            private int version;
+            private int _version;
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="ImmutableHashSet&lt;T&gt;.Builder"/> class.
+            /// Initializes a new instance of the <see cref="ImmutableHashSet{T}.Builder"/> class.
             /// </summary>
             /// <param name="set">The set.</param>
             internal Builder(ImmutableHashSet<T> set)
             {
                 Requires.NotNull(set, "set");
-                this.root = set.root;
-                this.count = set.count;
-                this.equalityComparer = set.equalityComparer;
-                this.immutable = set;
+                _root = set._root;
+                _count = set._count;
+                _equalityComparer = set._equalityComparer;
+                _immutable = set;
             }
 
             #region ISet<T> Properties
 
             /// <summary>
-            /// Gets the number of elements contained in the <see cref="T:System.Collections.Generic.ICollection`1"/>.
+            /// Gets the number of elements contained in the <see cref="ICollection{T}"/>.
             /// </summary>
-            /// <returns>The number of elements contained in the <see cref="T:System.Collections.Generic.ICollection`1"/>.</returns>
+            /// <returns>The number of elements contained in the <see cref="ICollection{T}"/>.</returns>
             public int Count
             {
-                get { return this.count; }
+                get { return _count; }
             }
 
             /// <summary>
-            /// Gets a value indicating whether the <see cref="T:System.Collections.Generic.ICollection`1"/> is read-only.
+            /// Gets a value indicating whether the <see cref="ICollection{T}"/> is read-only.
             /// </summary>
-            /// <returns>true if the <see cref="T:System.Collections.Generic.ICollection`1"/> is read-only; otherwise, false.</returns>
+            /// <returns>true if the <see cref="ICollection{T}"/> is read-only; otherwise, false.</returns>
             bool ICollection<T>.IsReadOnly
             {
                 get { return false; }
@@ -110,21 +104,21 @@ namespace System.Collections.Immutable
             {
                 get
                 {
-                    return this.equalityComparer;
+                    return _equalityComparer;
                 }
 
                 set
                 {
                     Requires.NotNull(value, "value");
 
-                    if (value != this.equalityComparer)
+                    if (value != _equalityComparer)
                     {
-                        var result = Union(this, new MutationInput(ImmutableSortedDictionary<int, HashBucket>.Node.EmptyNode, value, 0));
+                        var result = Union(this, new MutationInput(SortedInt32KeyNode<HashBucket>.EmptyNode, value, 0));
 
-                        this.immutable = null;
-                        this.equalityComparer = value;
+                        _immutable = null;
+                        _equalityComparer = value;
                         this.Root = result.Root;
-                        this.count = result.Count; // whether the offset or absolute, since the base is 0, it's no difference.
+                        _count = result.Count; // whether the offset or absolute, since the base is 0, it's no difference.
                     }
                 }
             }
@@ -134,7 +128,7 @@ namespace System.Collections.Immutable
             /// </summary>
             internal int Version
             {
-                get { return this.version; }
+                get { return _version; }
             }
 
             /// <summary>
@@ -142,17 +136,17 @@ namespace System.Collections.Immutable
             /// </summary>
             private MutationInput Origin
             {
-                get { return new MutationInput(this.Root, this.equalityComparer, this.count); }
+                get { return new MutationInput(this.Root, _equalityComparer, _count); }
             }
 
             /// <summary>
             /// Gets or sets the root of this data structure.
             /// </summary>
-            private ImmutableSortedDictionary<int, HashBucket>.Node Root
+            private SortedInt32KeyNode<HashBucket> Root
             {
                 get
                 {
-                    return this.root;
+                    return _root;
                 }
 
                 set
@@ -160,14 +154,14 @@ namespace System.Collections.Immutable
                     // We *always* increment the version number because some mutations
                     // may not create a new value of root, although the existing root
                     // instance may have mutated.
-                    this.version++;
+                    _version++;
 
-                    if (this.root != value)
+                    if (_root != value)
                     {
-                        this.root = value;
+                        _root = value;
 
                         // Clear any cached value for the immutable view since it is now invalidated.
-                        this.immutable = null;
+                        _immutable = null;
                     }
                 }
             }
@@ -178,11 +172,11 @@ namespace System.Collections.Immutable
             /// Returns an enumerator that iterates through the collection.
             /// </summary>
             /// <returns>
-            /// A <see cref="T:System.Collections.Generic.IEnumerator`1"/> that can be used to iterate through the collection.
+            /// A <see cref="IEnumerator{T}"/> that can be used to iterate through the collection.
             /// </returns>
             public Enumerator GetEnumerator()
             {
-                return new Enumerator(this.root, this);
+                return new Enumerator(_root, this);
             }
 
             /// <summary>
@@ -198,12 +192,12 @@ namespace System.Collections.Immutable
                 // Creating an instance of ImmutableSortedMap<T> with our root node automatically freezes our tree,
                 // ensuring that the returned instance is immutable.  Any further mutations made to this builder
                 // will clone (and unfreeze) the spine of modified nodes until the next time this method is invoked.
-                if (this.immutable == null)
+                if (_immutable == null)
                 {
-                    this.immutable = ImmutableHashSet<T>.Wrap(this.root, this.equalityComparer, this.count);
+                    _immutable = ImmutableHashSet<T>.Wrap(_root, _equalityComparer, _count);
                 }
 
-                return this.immutable;
+                return _immutable;
             }
 
             #endregion
@@ -223,13 +217,13 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Removes the first occurrence of a specific object from the <see cref="T:System.Collections.Generic.ICollection`1"/>.
+            /// Removes the first occurrence of a specific object from the <see cref="ICollection{T}"/>.
             /// </summary>
-            /// <param name="item">The object to remove from the <see cref="T:System.Collections.Generic.ICollection`1"/>.</param>
+            /// <param name="item">The object to remove from the <see cref="ICollection{T}"/>.</param>
             /// <returns>
-            /// true if <paramref name="item"/> was successfully removed from the <see cref="T:System.Collections.Generic.ICollection`1"/>; otherwise, false. This method also returns false if <paramref name="item"/> is not found in the original <see cref="T:System.Collections.Generic.ICollection`1"/>.
+            /// true if <paramref name="item"/> was successfully removed from the <see cref="ICollection{T}"/>; otherwise, false. This method also returns false if <paramref name="item"/> is not found in the original <see cref="ICollection{T}"/>.
             /// </returns>
-            /// <exception cref="T:System.NotSupportedException">The <see cref="T:System.Collections.Generic.ICollection`1"/> is read-only.</exception>
+            /// <exception cref="NotSupportedException">The <see cref="ICollection{T}"/> is read-only.</exception>
             public bool Remove(T item)
             {
                 var result = ImmutableHashSet<T>.Remove(item, this.Origin);
@@ -238,11 +232,11 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Determines whether the <see cref="T:System.Collections.Generic.ICollection`1"/> contains a specific value.
+            /// Determines whether the <see cref="ICollection{T}"/> contains a specific value.
             /// </summary>
-            /// <param name="item">The object to locate in the <see cref="T:System.Collections.Generic.ICollection`1"/>.</param>
+            /// <param name="item">The object to locate in the <see cref="ICollection{T}"/>.</param>
             /// <returns>
-            /// true if <paramref name="item"/> is found in the <see cref="T:System.Collections.Generic.ICollection`1"/>; otherwise, false.
+            /// true if <paramref name="item"/> is found in the <see cref="ICollection{T}"/>; otherwise, false.
             /// </returns>
             public bool Contains(T item)
             {
@@ -250,13 +244,13 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Removes all items from the <see cref="T:System.Collections.Generic.ICollection`1"/>.
+            /// Removes all items from the <see cref="ICollection{T}"/>.
             /// </summary>
-            /// <exception cref="T:System.NotSupportedException">The <see cref="T:System.Collections.Generic.ICollection`1"/> is read-only. </exception>
+            /// <exception cref="NotSupportedException">The <see cref="ICollection{T}"/> is read-only. </exception>
             public void Clear()
             {
-                this.count = 0;
-                this.Root = ImmutableSortedDictionary<int, HashBucket>.Node.EmptyNode;
+                _count = 0;
+                this.Root = SortedInt32KeyNode<HashBucket>.EmptyNode;
             }
 
             /// <summary>
@@ -265,7 +259,7 @@ namespace System.Collections.Immutable
             /// <param name="other">The collection of items to remove from the set.</param>
             public void ExceptWith(IEnumerable<T> other)
             {
-                var result = ImmutableHashSet<T>.Except(other, this.equalityComparer, this.root);
+                var result = ImmutableHashSet<T>.Except(other, _equalityComparer, _root);
                 this.Apply(result);
             }
 
@@ -336,6 +330,11 @@ namespace System.Collections.Immutable
             /// <returns>true if the current set is equal to other; otherwise, false.</returns>
             public bool SetEquals(IEnumerable<T> other)
             {
+                if (object.ReferenceEquals(this, other))
+                {
+                    return true;
+                }
+
                 return ImmutableHashSet<T>.SetEquals(other, this.Origin);
             }
 
@@ -364,17 +363,17 @@ namespace System.Collections.Immutable
             #region ICollection<T> Members
 
             /// <summary>
-            /// Adds an item to the <see cref="T:System.Collections.Generic.ICollection`1"/>.
+            /// Adds an item to the <see cref="ICollection{T}"/>.
             /// </summary>
-            /// <param name="item">The object to add to the <see cref="T:System.Collections.Generic.ICollection`1"/>.</param>
-            /// <exception cref="T:System.NotSupportedException">The <see cref="T:System.Collections.Generic.ICollection`1"/> is read-only.</exception>
+            /// <param name="item">The object to add to the <see cref="ICollection{T}"/>.</param>
+            /// <exception cref="NotSupportedException">The <see cref="ICollection{T}"/> is read-only.</exception>
             void ICollection<T>.Add(T item)
             {
                 this.Add(item);
             }
 
             /// <summary>
-            /// See the <see cref="ICollection&lt;T&gt;"/> interface.
+            /// See the <see cref="ICollection{T}"/> interface.
             /// </summary>
             void ICollection<T>.CopyTo(T[] array, int arrayIndex)
             {
@@ -396,7 +395,7 @@ namespace System.Collections.Immutable
             /// Returns an enumerator that iterates through the collection.
             /// </summary>
             /// <returns>
-            /// A <see cref="T:System.Collections.Generic.IEnumerator`1"/> that can be used to iterate through the collection.
+            /// A <see cref="IEnumerator{T}"/> that can be used to iterate through the collection.
             /// </returns>
             IEnumerator<T> IEnumerable<T>.GetEnumerator()
             {
@@ -407,7 +406,7 @@ namespace System.Collections.Immutable
             /// Returns an enumerator that iterates through a collection.
             /// </summary>
             /// <returns>
-            /// An <see cref="T:System.Collections.IEnumerator"/> object that can be used to iterate through the collection.
+            /// An <see cref="IEnumerator"/> object that can be used to iterate through the collection.
             /// </returns>
             IEnumerator IEnumerable.GetEnumerator()
             {
@@ -425,11 +424,11 @@ namespace System.Collections.Immutable
                 this.Root = result.Root;
                 if (result.CountType == CountType.Adjustment)
                 {
-                    this.count += result.Count;
+                    _count += result.Count;
                 }
                 else
                 {
-                    this.count = result.Count;
+                    _count = result.Count;
                 }
             }
         }

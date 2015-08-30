@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 
@@ -60,7 +59,7 @@ namespace System.Reflection.Internal
         {
             byte[] bytes = new byte[length];
             Marshal.Copy((IntPtr)ptr, bytes, 0, length);
-            return ImmutableArrayInterop.DangerousCreateFromUnderlyingArray(ref bytes);
+            return ImmutableByteArrayInterop.DangerousCreateFromUnderlyingArray(ref bytes);
         }
     }
 }

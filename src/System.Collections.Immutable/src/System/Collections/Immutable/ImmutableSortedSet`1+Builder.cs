@@ -1,19 +1,16 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
-using System.Linq;
 using Validation;
 
 namespace System.Collections.Immutable
 {
     /// <content>
-    /// Contains the inner Builder class.
+    /// Contains the inner <see cref="ImmutableSortedSet{T}.Builder"/> class.
     /// </content>
     [SuppressMessage("Microsoft.Naming", "CA1710:IdentifiersShouldHaveCorrectSuffix", Justification = "Ignored")]
     public sealed partial class ImmutableSortedSet<T>
@@ -24,7 +21,7 @@ namespace System.Collections.Immutable
         /// </summary>
         /// <remarks>
         /// <para>
-        /// While <see cref="ImmutableSortedSet&lt;T&gt;.Union"/> and other bulk change methods
+        /// While <see cref="ImmutableSortedSet{T}.Union"/> and other bulk change methods
         /// already provide fast bulk change operations on the collection, this class allows
         /// multiple combinations of changes to be made to a set with equal efficiency.
         /// </para>
@@ -35,34 +32,34 @@ namespace System.Collections.Immutable
         [SuppressMessage("Microsoft.Naming", "CA1710:IdentifiersShouldHaveCorrectSuffix", Justification = "Ignored")]
         [SuppressMessage("Microsoft.Design", "CA1034:NestedTypesShouldNotBeVisible", Justification = "Ignored")]
         [DebuggerDisplay("Count = {Count}")]
-        [DebuggerTypeProxy(typeof(ImmutableSortedSet<>.Builder.DebuggerProxy))]
+        [DebuggerTypeProxy(typeof(ImmutableSortedSetBuilderDebuggerProxy<>))]
         public sealed class Builder : ISortKeyCollection<T>, IReadOnlyCollection<T>, ISet<T>, ICollection
         {
             /// <summary>
             /// The root of the binary tree that stores the collection.  Contents are typically not entirely frozen.
             /// </summary>
-            private ImmutableSortedSet<T>.Node root = ImmutableSortedSet<T>.Node.EmptyNode;
+            private ImmutableSortedSet<T>.Node _root = ImmutableSortedSet<T>.Node.EmptyNode;
 
             /// <summary>
             /// The comparer to use for sorting the set.
             /// </summary>
-            private IComparer<T> comparer = Comparer<T>.Default;
+            private IComparer<T> _comparer = Comparer<T>.Default;
 
             /// <summary>
             /// Caches an immutable instance that represents the current state of the collection.
             /// </summary>
             /// <value>Null if no immutable view has been created for the current version.</value>
-            private ImmutableSortedSet<T> immutable;
+            private ImmutableSortedSet<T> _immutable;
 
             /// <summary>
             /// A number that increments every time the builder changes its contents.
             /// </summary>
-            private int version;
+            private int _version;
 
             /// <summary>
             /// The object callers may use to synchronize access to this collection.
             /// </summary>
-            private object syncRoot;
+            private object _syncRoot;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="Builder"/> class.
@@ -71,9 +68,9 @@ namespace System.Collections.Immutable
             internal Builder(ImmutableSortedSet<T> set)
             {
                 Requires.NotNull(set, "set");
-                this.root = set.root;
-                this.comparer = set.KeyComparer;
-                this.immutable = set;
+                _root = set._root;
+                _comparer = set.KeyComparer;
+                _immutable = set;
             }
 
             #region ISet<T> Properties
@@ -108,7 +105,7 @@ namespace System.Collections.Immutable
             /// </remarks>
             public T this[int index]
             {
-                get { return this.root[index]; }
+                get { return _root[index]; }
             }
 
             /// <summary>
@@ -117,7 +114,7 @@ namespace System.Collections.Immutable
             /// <value>The maximum value in the set.</value>
             public T Max
             {
-                get { return this.root.Max; }
+                get { return _root.Max; }
             }
 
             /// <summary>
@@ -126,11 +123,11 @@ namespace System.Collections.Immutable
             /// <value>The minimum value in the set.</value>
             public T Min
             {
-                get { return this.root.Min; }
+                get { return _root.Min; }
             }
 
             /// <summary>
-            ///  Gets or sets the System.Collections.Generic.IComparer&lt;T&gt; object that is used to determine equality for the values in the System.Collections.Generic.SortedSet&lt;T&gt;.
+            ///  Gets or sets the <see cref="IComparer{T}"/> object that is used to determine equality for the values in the <see cref="ImmutableSortedSet{T}"/>.
             /// </summary>
             /// <value>The comparer that is used to determine equality for the values in the set.</value>
             /// <remarks>
@@ -141,14 +138,14 @@ namespace System.Collections.Immutable
             {
                 get
                 {
-                    return this.comparer;
+                    return _comparer;
                 }
 
                 set
                 {
                     Requires.NotNull(value, "value");
 
-                    if (value != this.comparer)
+                    if (value != _comparer)
                     {
                         var newRoot = Node.EmptyNode;
                         foreach (T item in this)
@@ -157,8 +154,8 @@ namespace System.Collections.Immutable
                             newRoot = newRoot.Add(item, value, out mutated);
                         }
 
-                        this.immutable = null;
-                        this.comparer = value;
+                        _immutable = null;
+                        _comparer = value;
                         this.Root = newRoot;
                     }
                 }
@@ -169,7 +166,7 @@ namespace System.Collections.Immutable
             /// </summary>
             internal int Version
             {
-                get { return this.version; }
+                get { return _version; }
             }
 
             /// <summary>
@@ -179,7 +176,7 @@ namespace System.Collections.Immutable
             {
                 get
                 {
-                    return this.root;
+                    return _root;
                 }
 
                 set
@@ -187,14 +184,14 @@ namespace System.Collections.Immutable
                     // We *always* increment the version number because some mutations
                     // may not create a new value of root, although the existing root
                     // instance may have mutated.
-                    this.version++;
+                    _version++;
 
-                    if (this.root != value)
+                    if (_root != value)
                     {
-                        this.root = value;
+                        _root = value;
 
                         // Clear any cached value for the immutable view since it is now invalidated.
-                        this.immutable = null;
+                        _immutable = null;
                     }
                 }
             }
@@ -210,7 +207,7 @@ namespace System.Collections.Immutable
             public bool Add(T item)
             {
                 bool mutated;
-                this.Root = this.Root.Add(item, this.comparer, out mutated);
+                this.Root = this.Root.Add(item, _comparer, out mutated);
                 return mutated;
             }
 
@@ -225,7 +222,7 @@ namespace System.Collections.Immutable
                 foreach (T item in other)
                 {
                     bool mutated;
-                    this.Root = this.Root.Remove(item, this.comparer, out mutated);
+                    this.Root = this.Root.Remove(item, _comparer, out mutated);
                 }
             }
 
@@ -243,7 +240,7 @@ namespace System.Collections.Immutable
                     if (this.Contains(item))
                     {
                         bool mutated;
-                        result = result.Add(item, this.comparer, out mutated);
+                        result = result.Add(item, _comparer, out mutated);
                     }
                 }
 
@@ -316,7 +313,7 @@ namespace System.Collections.Immutable
             /// <param name="other">The collection to compare to the current set.</param>
             public void SymmetricExceptWith(IEnumerable<T> other)
             {
-                this.Root = this.ToImmutable().SymmetricExcept(other).root;
+                this.Root = this.ToImmutable().SymmetricExcept(other)._root;
             }
 
             /// <summary>
@@ -330,7 +327,7 @@ namespace System.Collections.Immutable
                 foreach (T item in other)
                 {
                     bool mutated;
-                    this.Root = this.Root.Add(item, this.comparer, out mutated);
+                    this.Root = this.Root.Add(item, _comparer, out mutated);
                 }
             }
 
@@ -359,15 +356,15 @@ namespace System.Collections.Immutable
             /// <returns>true if item is found in the set; false otherwise.</returns>
             public bool Contains(T item)
             {
-                return this.Root.Contains(item, this.comparer);
+                return this.Root.Contains(item, _comparer);
             }
 
             /// <summary>
-            /// See <see cref="ICollection&lt;T&gt;"/>
+            /// See <see cref="ICollection{T}"/>
             /// </summary>
             void ICollection<T>.CopyTo(T[] array, int arrayIndex)
             {
-                this.root.CopyTo(array, arrayIndex);
+                _root.CopyTo(array, arrayIndex);
             }
 
             /// <summary>
@@ -378,7 +375,7 @@ namespace System.Collections.Immutable
             public bool Remove(T item)
             {
                 bool mutated;
-                this.Root = this.Root.Remove(item, this.comparer, out mutated);
+                this.Root = this.Root.Remove(item, _comparer, out mutated);
                 return mutated;
             }
 
@@ -412,17 +409,17 @@ namespace System.Collections.Immutable
             #endregion
 
             /// <summary>
-            /// Returns an System.Collections.Generic.IEnumerable&lt;T&gt; that iterates over this
+            /// Returns an <see cref="IEnumerable{T}"/> that iterates over this
             /// collection in reverse order.
             /// </summary>
             /// <returns>
-            /// An enumerator that iterates over the System.Collections.Generic.SortedSet&lt;T&gt;
+            /// An enumerator that iterates over the <see cref="ImmutableSortedSet{T}.Builder"/>
             /// in reverse order.
             /// </returns>
             [Pure]
             public IEnumerable<T> Reverse()
             {
-                return new ReverseEnumerable(this.root);
+                return new ReverseEnumerable(_root);
             }
 
             /// <summary>
@@ -438,21 +435,21 @@ namespace System.Collections.Immutable
                 // Creating an instance of ImmutableSortedSet<T> with our root node automatically freezes our tree,
                 // ensuring that the returned instance is immutable.  Any further mutations made to this builder
                 // will clone (and unfreeze) the spine of modified nodes until the next time this method is invoked.
-                if (this.immutable == null)
+                if (_immutable == null)
                 {
-                    this.immutable = ImmutableSortedSet<T>.Wrap(this.Root, this.comparer);
+                    _immutable = ImmutableSortedSet<T>.Wrap(this.Root, _comparer);
                 }
 
-                return this.immutable;
+                return _immutable;
             }
 
             #region ICollection members
 
             /// <summary>
-            /// Copies the elements of the <see cref="T:System.Collections.ICollection" /> to an <see cref="T:System.Array" />, starting at a particular <see cref="T:System.Array" /> index.
+            /// Copies the elements of the <see cref="ICollection"/> to an <see cref="Array"/>, starting at a particular <see cref="Array"/> index.
             /// </summary>
-            /// <param name="array">The one-dimensional <see cref="T:System.Array" /> that is the destination of the elements copied from <see cref="T:System.Collections.ICollection" />. The <see cref="T:System.Array" /> must have zero-based indexing.</param>
-            /// <param name="arrayIndex">The zero-based index in <paramref name="array" /> at which copying begins.</param>
+            /// <param name="array">The one-dimensional <see cref="Array"/> that is the destination of the elements copied from <see cref="ICollection"/>. The <see cref="Array"/> must have zero-based indexing.</param>
+            /// <param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param>
             /// <exception cref="System.NotImplementedException"></exception>
             void ICollection.CopyTo(Array array, int arrayIndex)
             {
@@ -460,9 +457,9 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Gets a value indicating whether access to the <see cref="T:System.Collections.ICollection" /> is synchronized (thread safe).
+            /// Gets a value indicating whether access to the <see cref="ICollection"/> is synchronized (thread safe).
             /// </summary>
-            /// <returns>true if access to the <see cref="T:System.Collections.ICollection" /> is synchronized (thread safe); otherwise, false.</returns>
+            /// <returns>true if access to the <see cref="ICollection"/> is synchronized (thread safe); otherwise, false.</returns>
             /// <exception cref="System.NotImplementedException"></exception>
             [DebuggerBrowsable(DebuggerBrowsableState.Never)]
             bool ICollection.IsSynchronized
@@ -471,68 +468,66 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Gets an object that can be used to synchronize access to the <see cref="T:System.Collections.ICollection" />.
+            /// Gets an object that can be used to synchronize access to the <see cref="ICollection"/>.
             /// </summary>
-            /// <returns>An object that can be used to synchronize access to the <see cref="T:System.Collections.ICollection" />.</returns>
+            /// <returns>An object that can be used to synchronize access to the <see cref="ICollection"/>.</returns>
             /// <exception cref="System.NotImplementedException"></exception>
             [DebuggerBrowsable(DebuggerBrowsableState.Never)]
             object ICollection.SyncRoot
             {
                 get
                 {
-                    if (this.syncRoot == null)
+                    if (_syncRoot == null)
                     {
-                        Threading.Interlocked.CompareExchange<Object>(ref this.syncRoot, new Object(), null);
+                        Threading.Interlocked.CompareExchange<Object>(ref _syncRoot, new Object(), null);
                     }
 
-                    return this.syncRoot;
+                    return _syncRoot;
                 }
             }
-
             #endregion
+        }
+    }
 
-            /// <summary>
-            /// A simple view of the immutable collection that the debugger can show to the developer.
-            /// </summary>
-            [ExcludeFromCodeCoverage]
-            private class DebuggerProxy
+    /// <summary>
+    /// A simple view of the immutable collection that the debugger can show to the developer.
+    /// </summary>
+    internal class ImmutableSortedSetBuilderDebuggerProxy<T>
+    {
+        /// <summary>
+        /// The collection to be enumerated.
+        /// </summary>
+        private readonly ImmutableSortedSet<T>.Builder _set;
+
+        /// <summary>
+        /// The simple view of the collection.
+        /// </summary>
+        private T[] _contents;
+
+        /// <summary>   
+        /// Initializes a new instance of the <see cref="ImmutableSortedSetBuilderDebuggerProxy{T}"/> class.
+        /// </summary>
+        /// <param name="builder">The collection to display in the debugger</param>
+        public ImmutableSortedSetBuilderDebuggerProxy(ImmutableSortedSet<T>.Builder builder)
+        {
+            Requires.NotNull(builder, "builder");
+            _set = builder;
+        }
+
+        /// <summary>
+        /// Gets a simple debugger-viewable collection.
+        /// </summary>
+        [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+        public T[] Contents
+        {
+            get
             {
-                /// <summary>
-                /// The collection to be enumerated.
-                /// </summary>
-                private readonly ImmutableSortedSet<T>.Node set;
-
-                /// <summary>
-                /// The simple view of the collection.
-                /// </summary>
-                private T[] contents;
-
-                /// <summary>   
-                /// Initializes a new instance of the <see cref="DebuggerProxy"/> class.
-                /// </summary>
-                /// <param name="builder">The collection to display in the debugger</param>
-                public DebuggerProxy(ImmutableSortedSet<T>.Builder builder)
+                if (_contents == null)
                 {
-                    Requires.NotNull(builder, "builder");
-                    this.set = builder.Root;
+                    _contents = _set.ToArray(_set.Count);
                 }
 
-                /// <summary>
-                /// Gets a simple debugger-viewable collection.
-                /// </summary>
-                [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-                public T[] Contents
-                {
-                    get
-                    {
-                        if (this.contents == null)
-                        {
-                            this.contents = this.set.ToArray(this.set.Count);
-                        }
-
-                        return this.contents;
-                    }
-                }
+                return _contents;
             }
         }
     }

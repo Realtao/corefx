@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Reflection.Internal;
-using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using TestUtilities;
 using Xunit;
@@ -38,112 +37,112 @@ namespace System.Reflection.Metadata.Tests
             {
                 var reader = new BlobReader(new MemoryBlock(bufferPtr, buffer.Length));
 
-                Assert.Equal(false, reader.SeekOffset(-1));
-                Assert.Equal(false, reader.SeekOffset(Int32.MaxValue));
-                Assert.Equal(false, reader.SeekOffset(Int32.MinValue));
-                Assert.Equal(false, reader.SeekOffset(buffer.Length));
-                Assert.Equal(true, reader.SeekOffset(buffer.Length - 1));
+                Assert.False(reader.SeekOffset(-1));
+                Assert.False(reader.SeekOffset(Int32.MaxValue));
+                Assert.False(reader.SeekOffset(Int32.MinValue));
+                Assert.False(reader.SeekOffset(buffer.Length));
+                Assert.True(reader.SeekOffset(buffer.Length - 1));
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Equal(0, reader.Offset);
                 Assert.Throws<BadImageFormatException>(() => reader.ReadUInt64());
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(1));
+                Assert.True(reader.SeekOffset(1));
                 Assert.Equal(1, reader.Offset);
                 Assert.Throws<BadImageFormatException>(() => reader.ReadDouble());
                 Assert.Equal(1, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(2));
+                Assert.True(reader.SeekOffset(2));
                 Assert.Equal(2, reader.Offset);
                 Assert.Throws<BadImageFormatException>(() => reader.ReadUInt32());
                 Assert.Equal((ushort)0x0200, reader.ReadUInt16());
                 Assert.Equal(4, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(2));
+                Assert.True(reader.SeekOffset(2));
                 Assert.Equal(2, reader.Offset);
                 Assert.Throws<BadImageFormatException>(() => reader.ReadSingle());
                 Assert.Equal(2, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Equal(9.404242E-38F, reader.ReadSingle());
                 Assert.Equal(4, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(3));
+                Assert.True(reader.SeekOffset(3));
                 Assert.Equal(3, reader.Offset);
                 Assert.Throws<BadImageFormatException>(() => reader.ReadUInt16());
                 Assert.Equal((byte)0x02, reader.ReadByte());
                 Assert.Equal(4, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Equal("\u0000\u0001\u0000\u0002", reader.ReadUTF8(4));
                 Assert.Equal(4, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Throws<BadImageFormatException>(() => reader.ReadUTF8(5));
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Throws<BadImageFormatException>(() => reader.ReadUTF8(-1));
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Equal("\u0100\u0200", reader.ReadUTF16(4));
                 Assert.Equal(4, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Throws<BadImageFormatException>(() => reader.ReadUTF16(5));
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Throws<BadImageFormatException>(() => reader.ReadUTF16(-1));
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Throws<BadImageFormatException>(() => reader.ReadUTF16(6));
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 AssertEx.Equal(buffer, reader.ReadBytes(4));
                 Assert.Equal(4, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Same(String.Empty, reader.ReadUtf8NullTerminated());
                 Assert.Equal(1, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(1));
+                Assert.True(reader.SeekOffset(1));
                 Assert.Equal("\u0001", reader.ReadUtf8NullTerminated());
                 Assert.Equal(3, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(3));
+                Assert.True(reader.SeekOffset(3));
                 Assert.Equal("\u0002", reader.ReadUtf8NullTerminated());
                 Assert.Equal(4, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Same(String.Empty, reader.ReadUtf8NullTerminated());
                 Assert.Equal(1, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Throws<BadImageFormatException>(() => reader.ReadBytes(5));
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Throws<BadImageFormatException>(() => reader.ReadBytes(Int32.MinValue));
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Throws<BadImageFormatException>(() => reader.GetMemoryBlockAt(-1, 1));
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Throws<BadImageFormatException>(() => reader.GetMemoryBlockAt(1, -1));
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(0));
+                Assert.True(reader.SeekOffset(0));
                 Assert.Equal(3, reader.GetMemoryBlockAt(1, 3).Length);
                 Assert.Equal(0, reader.Offset);
 
-                Assert.Equal(true, reader.SeekOffset(3));
+                Assert.True(reader.SeekOffset(3));
                 reader.ReadByte();
                 Assert.Equal(4, reader.Offset);
 
@@ -152,7 +151,7 @@ namespace System.Reflection.Metadata.Tests
 
                 Assert.Equal(4, reader.Offset);
                 int value;
-                Assert.Equal(false, reader.TryReadCompressedInteger(out value));
+                Assert.False(reader.TryReadCompressedInteger(out value));
                 Assert.Equal(BlobReader.InvalidCompressedInteger, value);
 
                 Assert.Equal(4, reader.Offset);
@@ -165,7 +164,7 @@ namespace System.Reflection.Metadata.Tests
                 Assert.Equal(SignatureTypeCode.Invalid, reader.ReadSignatureTypeCode());
 
                 Assert.Equal(4, reader.Offset);
-                Assert.Equal(default(Handle), reader.ReadTypeHandle());
+                Assert.Equal(default(EntityHandle), reader.ReadTypeHandle());
 
                 Assert.Equal(4, reader.Offset);
                 Assert.Throws<BadImageFormatException>(() => reader.ReadBoolean());
@@ -224,23 +223,23 @@ namespace System.Reflection.Metadata.Tests
                 var block = new MemoryBlock(bufferPtr, buffer.Length);
 
                 // small ref size always fits in 16 bits
-                Assert.Equal(0xFFFFU, block.PeekReference(0, smallRefSize: true));
-                Assert.Equal(0xFFFFU, block.PeekReference(4, smallRefSize: true));
+                Assert.Equal(0xFFFF, block.PeekReference(0, smallRefSize: true));
+                Assert.Equal(0xFFFF, block.PeekReference(4, smallRefSize: true));
                 Assert.Equal(0xFFFFU, block.PeekTaggedReference(0, smallRefSize: true));
                 Assert.Equal(0xFFFFU, block.PeekTaggedReference(4, smallRefSize: true));
                 Assert.Equal(0x01FFU, block.PeekTaggedReference(6, smallRefSize: true));
 
                 // large ref size throws on > RIDMask when tagged variant is not used.
-                AssertEx.Throws<BadImageFormatException>(() => block.PeekReference(0, smallRefSize: false), MetadataResources.RowIdOrHeapOffsetTooLarge);
-                AssertEx.Throws<BadImageFormatException>(() => block.PeekReference(4, smallRefSize: false), MetadataResources.RowIdOrHeapOffsetTooLarge);
+                AssertEx.Throws<BadImageFormatException>(() => block.PeekReference(0, smallRefSize: false), SR.RowIdOrHeapOffsetTooLarge);
+                AssertEx.Throws<BadImageFormatException>(() => block.PeekReference(4, smallRefSize: false), SR.RowIdOrHeapOffsetTooLarge);
 
                 // large ref size does not throw when Tagged variant is used.
                 Assert.Equal(0xFFFFFFFFU, block.PeekTaggedReference(0, smallRefSize: false));
                 Assert.Equal(0x01FFFFFFU, block.PeekTaggedReference(4, smallRefSize: false));
 
                 // bounds check applies in all cases
-                AssertEx.Throws<BadImageFormatException>(() => block.PeekReference(7, smallRefSize: true), MetadataResources.OutOfBoundsRead);
-                AssertEx.Throws<BadImageFormatException>(() => block.PeekReference(5, smallRefSize: false), MetadataResources.OutOfBoundsRead);
+                AssertEx.Throws<BadImageFormatException>(() => block.PeekReference(7, smallRefSize: true), SR.OutOfBoundsRead);
+                AssertEx.Throws<BadImageFormatException>(() => block.PeekReference(5, smallRefSize: false), SR.OutOfBoundsRead);
             }
         }
 

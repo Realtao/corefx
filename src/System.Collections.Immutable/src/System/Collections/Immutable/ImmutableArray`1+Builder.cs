@@ -1,14 +1,10 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Validation;
 
 namespace System.Collections.Immutable
@@ -20,18 +16,18 @@ namespace System.Collections.Immutable
         /// instance without allocating memory.
         /// </summary>
         [DebuggerDisplay("Count = {Count}")]
-        [DebuggerTypeProxy(typeof(ImmutableArray<>.Builder.DebuggerProxy))]
+        [DebuggerTypeProxy(typeof(ImmutableArrayBuilderDebuggerProxy<>))]
         public sealed class Builder : IList<T>, IReadOnlyList<T>
         {
             /// <summary>
             /// The backing array for the builder.
             /// </summary>
-            private RefAsValueType<T>[] elements;
+            private T[] _elements;
 
             /// <summary>
             /// The number of initialized elements in the array.
             /// </summary>
-            private int count;
+            private int _count;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="Builder"/> class.
@@ -40,8 +36,8 @@ namespace System.Collections.Immutable
             internal Builder(int capacity)
             {
                 Requires.Range(capacity >= 0, "capacity");
-                this.elements = new RefAsValueType<T>[capacity];
-                this.Count = 0;
+                _elements = new T[capacity];
+                _count = 0;
             }
 
             /// <summary>
@@ -53,49 +49,82 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Gets or sets the length of the array.
+            /// Get and sets the length of the internal array.  When set the internal array is
+            /// reallocated to the given capacity if it is not already the specified length.
+            /// </summary>
+            public int Capacity
+            {
+                get { return _elements.Length; }
+                set
+                {
+                    if (value < _count)
+                    {
+                        throw new ArgumentException(SR.CapacityMustBeGreaterThanOrEqualToCount, paramName: "value");
+                    }
+
+                    if (value != _elements.Length)
+                    {
+                        if (value > 0)
+                        {
+                            var temp = new T[value];
+                            if (_count > 0)
+                            {
+                                Array.Copy(_elements, 0, temp, 0, _count);
+                            }
+
+                            _elements = temp;
+                        }
+                        else
+                        {
+                            _elements = ImmutableArray<T>.Empty.array;
+                        }
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Gets or sets the length of the builder.
             /// </summary>
             /// <remarks>
             /// If the value is decreased, the array contents are truncated.
-            /// If the value is increased, the added elements are initialized to <c>default(T)</c>.
+            /// If the value is increased, the added elements are initialized to the default value of type <typeparamref name="T"/>.
             /// </remarks>
             public int Count
             {
                 get
                 {
-                    return this.count;
+                    return _count;
                 }
 
                 set
                 {
                     Requires.Range(value >= 0, "value");
-                    if (value < this.count)
+                    if (value < _count)
                     {
                         // truncation mode
                         // Clear the elements of the elements that are effectively removed.
-                        var e = this.elements;
 
                         // PERF: Array.Clear works well for big arrays, 
                         //       but may have too much overhead with small ones (which is the common case here)
-                        if (this.count - value > 64)
+                        if (_count - value > 64)
                         {
-                            Array.Clear(this.elements, value, this.count - value);
+                            Array.Clear(_elements, value, _count - value);
                         }
                         else
                         {
                             for (int i = value; i < this.Count; i++)
                             {
-                                this.elements[i].Value = default(T);
+                                _elements[i] = default(T);
                             }
                         }
                     }
-                    else if (value > this.count)
+                    else if (value > _count)
                     {
                         // expansion
                         this.EnsureCapacity(value);
                     }
 
-                    this.count = value;
+                    _count = value;
                 }
             }
 
@@ -115,7 +144,7 @@ namespace System.Collections.Immutable
                         throw new IndexOutOfRangeException();
                     }
 
-                    return this.elements[index].Value;
+                    return _elements[index];
                 }
 
                 set
@@ -125,14 +154,14 @@ namespace System.Collections.Immutable
                         throw new IndexOutOfRangeException();
                     }
 
-                    this.elements[index].Value = value;
+                    _elements[index] = value;
                 }
             }
 
             /// <summary>
-            /// Gets a value indicating whether the <see cref="T:System.Collections.Generic.ICollection`1" /> is read-only.
+            /// Gets a value indicating whether the <see cref="ICollection{T}"/> is read-only.
             /// </summary>
-            /// <returns>true if the <see cref="T:System.Collections.Generic.ICollection`1" /> is read-only; otherwise, false.
+            /// <returns>true if the <see cref="ICollection{T}"/> is read-only; otherwise, false.
             ///   </returns>
             bool ICollection<T>.IsReadOnly
             {
@@ -145,7 +174,7 @@ namespace System.Collections.Immutable
             /// <returns>An immutable array.</returns>
             public ImmutableArray<T> ToImmutable()
             {
-                if (this.Count == 0)
+                if (Count == 0)
                 {
                     return Empty;
                 }
@@ -154,7 +183,26 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Removes all items from the <see cref="T:System.Collections.Generic.ICollection`1" />.
+            /// Extracts the internal array as an <see cref="ImmutableArray{T}"/> and replaces it 
+            /// with a zero length array.
+            /// </summary>
+            /// <exception cref="InvalidOperationException">When <see cref="ImmutableArray{T}.Builder.Count"/> doesn't 
+            /// equal <see cref="ImmutableArray{T}.Builder.Capacity"/>.</exception>
+            public ImmutableArray<T> MoveToImmutable()
+            {
+                if (Capacity != Count)
+                {
+                    throw new InvalidOperationException(SR.CapacityMustEqualCountOnMove);
+                }
+
+                T[] temp = _elements;
+                _elements = ImmutableArray<T>.Empty.array;
+                _count = 0;
+                return new ImmutableArray<T>(temp);
+            }
+
+            /// <summary>
+            /// Removes all items from the <see cref="ICollection{T}"/>.
             /// </summary>
             public void Clear()
             {
@@ -162,10 +210,10 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Inserts an item to the <see cref="T:System.Collections.Generic.IList`1" /> at the specified index.
+            /// Inserts an item to the <see cref="IList{T}"/> at the specified index.
             /// </summary>
-            /// <param name="index">The zero-based index at which <paramref name="item" /> should be inserted.</param>
-            /// <param name="item">The object to insert into the <see cref="T:System.Collections.Generic.IList`1" />.</param>
+            /// <param name="index">The zero-based index at which <paramref name="item"/> should be inserted.</param>
+            /// <param name="item">The object to insert into the <see cref="IList{T}"/>.</param>
             public void Insert(int index, T item)
             {
                 Requires.Range(index >= 0 && index <= this.Count, "index");
@@ -173,21 +221,21 @@ namespace System.Collections.Immutable
 
                 if (index < this.Count)
                 {
-                    Array.Copy(this.elements, index, this.elements, index + 1, this.Count - index);
+                    Array.Copy(_elements, index, _elements, index + 1, this.Count - index);
                 }
 
-                this.count++;
-                this.elements[index].Value = item;
+                _count++;
+                _elements[index] = item;
             }
 
             /// <summary>
-            /// Adds an item to the <see cref="T:System.Collections.Generic.ICollection`1" />.
+            /// Adds an item to the <see cref="ICollection{T}"/>.
             /// </summary>
-            /// <param name="item">The object to add to the <see cref="T:System.Collections.Generic.ICollection`1" />.</param>
+            /// <param name="item">The object to add to the <see cref="ICollection{T}"/>.</param>
             public void Add(T item)
             {
                 this.EnsureCapacity(this.Count + 1);
-                this.elements[this.count++].Value = item;
+                _elements[_count++] = item;
             }
 
             /// <summary>
@@ -221,11 +269,7 @@ namespace System.Collections.Immutable
                 var offset = this.Count;
                 this.Count += items.Length;
 
-                var nodes = this.elements;
-                for (int i = 0; i < items.Length; i++)
-                {
-                    nodes[offset + i].Value = items[i];
-                }
+                Array.Copy(items, 0, _elements, offset, items.Length);
             }
 
             /// <summary>
@@ -239,11 +283,7 @@ namespace System.Collections.Immutable
                 var offset = this.Count;
                 this.Count += items.Length;
 
-                var nodes = this.elements;
-                for (int i = 0; i < items.Length; i++)
-                {
-                    nodes[offset + i].Value = items[i];
-                }
+                Array.Copy(items, 0, _elements, offset, items.Length);
             }
 
             /// <summary>
@@ -254,16 +294,12 @@ namespace System.Collections.Immutable
             public void AddRange(T[] items, int length)
             {
                 Requires.NotNull(items, "items");
-                Requires.Range(length >= 0, "length");
+                Requires.Range(length >= 0 && length <= items.Length, "length");
 
                 var offset = this.Count;
                 this.Count += length;
 
-                var nodes = this.elements;
-                for (int i = 0; i < length; i++)
-                {
-                    nodes[offset + i].Value = items[i];
-                }
+                Array.Copy(items, 0, _elements, offset, length);
             }
 
             /// <summary>
@@ -309,7 +345,7 @@ namespace System.Collections.Immutable
             public void AddRange(Builder items)
             {
                 Requires.NotNull(items, "items");
-                this.AddRange(items.elements, items.Count);
+                this.AddRange(items._elements, items.Count);
             }
 
             /// <summary>
@@ -319,7 +355,7 @@ namespace System.Collections.Immutable
             public void AddRange<TDerived>(ImmutableArray<TDerived>.Builder items) where TDerived : T
             {
                 Requires.NotNull(items, "items");
-                this.AddRange(items.elements, items.Count);
+                this.AddRange(items._elements, items.Count);
             }
 
             /// <summary>
@@ -340,7 +376,7 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Removes the <see cref="T:System.Collections.Generic.IList`1" /> item at the specified index.
+            /// Removes the <see cref="IList{T}"/> item at the specified index.
             /// </summary>
             /// <param name="index">The zero-based index of the item to remove.</param>
             public void RemoveAt(int index)
@@ -349,18 +385,18 @@ namespace System.Collections.Immutable
 
                 if (index < this.Count - 1)
                 {
-                    Array.Copy(this.elements, index + 1, this.elements, index, this.Count - index - 1);
+                    Array.Copy(_elements, index + 1, _elements, index, this.Count - index - 1);
                 }
 
                 this.Count--;
             }
 
             /// <summary>
-            /// Determines whether the <see cref="T:System.Collections.Generic.ICollection`1" /> contains a specific value.
+            /// Determines whether the <see cref="ICollection{T}"/> contains a specific value.
             /// </summary>
-            /// <param name="item">The object to locate in the <see cref="T:System.Collections.Generic.ICollection`1" />.</param>
+            /// <param name="item">The object to locate in the <see cref="ICollection{T}"/>.</param>
             /// <returns>
-            /// true if <paramref name="item" /> is found in the <see cref="T:System.Collections.Generic.ICollection`1" />; otherwise, false.
+            /// true if <paramref name="item"/> is found in the <see cref="ICollection{T}"/>; otherwise, false.
             /// </returns>
             public bool Contains(T item)
             {
@@ -372,14 +408,9 @@ namespace System.Collections.Immutable
             /// </summary>
             public T[] ToArray()
             {
-                var tmp = new T[this.Count];
-                var elements = this.elements;
-                for (int i = 0; i < tmp.Length; i++)
-                {
-                    tmp[i] = elements[i].Value;
-                }
-
-                return tmp;
+                T[] result = new T[this.Count];
+                Array.Copy(_elements, 0, result, 0, this.Count);
+                return result;
             }
 
             /// <summary>
@@ -391,37 +422,33 @@ namespace System.Collections.Immutable
             {
                 Requires.NotNull(array, "array");
                 Requires.Range(index >= 0 && index + this.Count <= array.Length, "start");
-
-                foreach (var item in this)
-                {
-                    array[index++] = item;
-                }
+                Array.Copy(_elements, 0, array, index, this.Count);
             }
 
             /// <summary>
             /// Resizes the array to accommodate the specified capacity requirement.
             /// </summary>
             /// <param name="capacity">The required capacity.</param>
-            public void EnsureCapacity(int capacity)
+            private void EnsureCapacity(int capacity)
             {
-                if (this.elements.Length < capacity)
+                if (_elements.Length < capacity)
                 {
-                    int newCapacity = Math.Max(this.elements.Length * 2, capacity);
-                    Array.Resize(ref this.elements, newCapacity);
+                    int newCapacity = Math.Max(_elements.Length * 2, capacity);
+                    Array.Resize(ref _elements, newCapacity);
                 }
             }
 
             /// <summary>
-            /// Determines the index of a specific item in the <see cref="T:System.Collections.Generic.IList`1" />.
+            /// Determines the index of a specific item in the <see cref="IList{T}"/>.
             /// </summary>
-            /// <param name="item">The object to locate in the <see cref="T:System.Collections.Generic.IList`1" />.</param>
+            /// <param name="item">The object to locate in the <see cref="IList{T}"/>.</param>
             /// <returns>
-            /// The index of <paramref name="item" /> if found in the list; otherwise, -1.
+            /// The index of <paramref name="item"/> if found in the list; otherwise, -1.
             /// </returns>
             [Pure]
             public int IndexOf(T item)
             {
-                return this.IndexOf(item, 0, this.count, EqualityComparer<T>.Default);
+                return this.IndexOf(item, 0, _count, EqualityComparer<T>.Default);
             }
 
             /// <summary>
@@ -472,13 +499,13 @@ namespace System.Collections.Immutable
 
                 if (equalityComparer == EqualityComparer<T>.Default)
                 {
-                    return Array.IndexOf(this.elements, new RefAsValueType<T>(item), startIndex, count);
+                    return Array.IndexOf(_elements, item, startIndex, count);
                 }
                 else
                 {
                     for (int i = startIndex; i < startIndex + count; i++)
                     {
-                        if (equalityComparer.Equals(this.elements[i].Value, item))
+                        if (equalityComparer.Equals(_elements[i], item))
                         {
                             return i;
                         }
@@ -559,13 +586,13 @@ namespace System.Collections.Immutable
 
                 if (equalityComparer == EqualityComparer<T>.Default)
                 {
-                    return Array.LastIndexOf(this.elements, new RefAsValueType<T>(item), startIndex, count);
+                    return Array.LastIndexOf(_elements, item, startIndex, count);
                 }
                 else
                 {
                     for (int i = startIndex; i >= startIndex - count + 1; i--)
                     {
-                        if (equalityComparer.Equals(item, this.elements[i].Value))
+                        if (equalityComparer.Equals(item, _elements[i]))
                         {
                             return i;
                         }
@@ -578,14 +605,22 @@ namespace System.Collections.Immutable
             /// <summary>
             /// Reverses the order of elements in the collection.
             /// </summary>
-            public void ReverseContents()
+            public void Reverse()
             {
-                int end = this.Count - 1;
-                for (int i = 0, j = end; i < j; i++, j--)
+                // The non-generic Array.Reverse is not used because it does not perform
+                // well for non-primitive value types.
+                // If/when a generic Array.Reverse<T> becomes available, the below code
+                // can be deleted and replaced with a call to Array.Reverse<T>.
+                int i = 0;
+                int j = _count - 1;
+                T[] array = _elements;
+                while (i < j)
                 {
-                    var tmp = this.elements[i].Value;
-                    this.elements[i] = this.elements[j];
-                    this.elements[j].Value = tmp;
+                    T temp = array[i];
+                    array[i] = array[j];
+                    array[j] = temp;
+                    i++;
+                    j--;
                 }
             }
 
@@ -594,7 +629,10 @@ namespace System.Collections.Immutable
             /// </summary>
             public void Sort()
             {
-                Array.Sort(this.elements, 0, this.Count, new Comparer(Comparer<T>.Default));
+                if (Count > 1)
+                {
+                    Array.Sort(_elements, 0, this.Count, Comparer<T>.Default);
+                }
             }
 
             /// <summary>
@@ -603,7 +641,10 @@ namespace System.Collections.Immutable
             /// <param name="comparer">The comparer to use in sorting. If <c>null</c>, the default comparer is used.</param>
             public void Sort(IComparer<T> comparer)
             {
-                Array.Sort(this.elements, 0, this.Count, new Comparer(comparer));
+                if (Count > 1)
+                {
+                    Array.Sort(_elements, 0, _count, comparer);
+                }
             }
 
             /// <summary>
@@ -615,11 +656,14 @@ namespace System.Collections.Immutable
             public void Sort(int index, int count, IComparer<T> comparer)
             {
                 // Don't rely on Array.Sort's argument validation since our internal array may exceed
-                // the bounds of the publically addressible region.
+                // the bounds of the publicly addressable region.
                 Requires.Range(index >= 0, "index");
                 Requires.Range(count >= 0 && index + count <= this.Count, "count");
 
-                Array.Sort(this.elements, index, count, new Comparer(comparer));
+                if (count > 1)
+                {
+                    Array.Sort(_elements, index, count, comparer);
+                }
             }
 
             /// <summary>
@@ -658,64 +702,49 @@ namespace System.Collections.Immutable
             /// <typeparam name="TDerived">The type of source elements.</typeparam>
             /// <param name="items">The source array.</param>
             /// <param name="length">The number of elements to add to this array.</param>
-            private void AddRange<TDerived>(RefAsValueType<TDerived>[] items, int length) where TDerived : T
+            private void AddRange<TDerived>(TDerived[] items, int length) where TDerived : T
             {
                 this.EnsureCapacity(this.Count + length);
 
                 var offset = this.Count;
                 this.Count += length;
 
-                var nodes = this.elements;
+                var nodes = _elements;
                 for (int i = 0; i < length; i++)
                 {
-                    nodes[offset + i].Value = items[i].Value;
+                    nodes[offset + i] = items[i];
                 }
             }
+        }
+    }
 
-            #region DebuggerProxy
+    /// <summary>
+    /// A simple view of the immutable collection that the debugger can show to the developer.
+    /// </summary>
+    internal sealed class ImmutableArrayBuilderDebuggerProxy<T>
+    {
+        /// <summary>
+        /// The collection to be enumerated.
+        /// </summary>
+        private readonly ImmutableArray<T>.Builder _builder;
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ImmutableArrayBuilderDebuggerProxy{T}"/> class.
+        /// </summary>
+        /// <param name="builder">The collection to display in the debugger</param>
+        public ImmutableArrayBuilderDebuggerProxy(ImmutableArray<T>.Builder builder)
+        {
+            _builder = builder;
+        }
 
-            [ExcludeFromCodeCoverage]
-            private sealed class DebuggerProxy
+        /// <summary>
+        /// Gets a simple debugger-viewable collection.
+        /// </summary>
+        [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+        public T[] A
+        {
+            get
             {
-                private readonly Builder builder;
-
-                public DebuggerProxy(Builder builder)
-                {
-                    this.builder = builder;
-                }
-
-                [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-                public T[] A
-                {
-                    get
-                    {
-                        var result = new T[this.builder.Count];
-                        for (int i = 0; i < result.Length; i++)
-                        {
-                            result[i] = this.builder.elements[i].Value;
-                        }
-
-                        return result;
-                    }
-                }
-            }
-
-            #endregion
-
-            private sealed class Comparer : IComparer<RefAsValueType<T>>
-            {
-                private readonly IComparer<T> comparer;
-
-                internal Comparer(IComparer<T> comparer = null)
-                {
-                    Requires.NotNull(comparer, "comparer");
-                    this.comparer = comparer;
-                }
-
-                public int Compare(RefAsValueType<T> x, RefAsValueType<T> y)
-                {
-                    return this.comparer.Compare(x.Value, y.Value);
-                }
+                return _builder.ToArray();
             }
         }
     }

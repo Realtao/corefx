@@ -1,17 +1,16 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Linq;
-using System.Runtime.InteropServices;
 using Validation;
 
 namespace System.Collections.Immutable
 {
     /// <summary>
-    /// A set of initialization methods for instances of <see cref="ImmutableArray{T}" />.
+    /// A set of initialization methods for instances of <see cref="ImmutableArray{T}"/>.
     /// </summary>
     public static class ImmutableArray
     {
@@ -21,7 +20,7 @@ namespace System.Collections.Immutable
         internal static readonly byte[] TwoElementArray = new byte[2];
 
         /// <summary>
-        /// Creates an empty ImmutableArray{T}.
+        /// Creates an empty <see cref="ImmutableArray{T}"/>.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <returns>An empty array.</returns>
@@ -32,7 +31,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Creates an ImmutableArray{T} with the specified element as its only member.
+        /// Creates an <see cref="ImmutableArray{T}"/> with the specified element as its only member.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <param name="item">The element to store in the array.</param>
@@ -45,12 +44,12 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Creates an ImmutableArray{T} with the specified elements.
+        /// Creates an <see cref="ImmutableArray{T}"/> with the specified elements.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <param name="item1">The first element to store in the array.</param>
         /// <param name="item2">The second element to store in the array.</param>
-        /// <returns>A 1-element array.</returns>
+        /// <returns>A 2-element array.</returns>
         [Pure]
         public static ImmutableArray<T> Create<T>(T item1, T item2)
         {
@@ -59,13 +58,13 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Creates an ImmutableArray{T} with the specified elements.
+        /// Creates an <see cref="ImmutableArray{T}"/> with the specified elements.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <param name="item1">The first element to store in the array.</param>
         /// <param name="item2">The second element to store in the array.</param>
         /// <param name="item3">The third element to store in the array.</param>
-        /// <returns>A 1-element array.</returns>
+        /// <returns>A 3-element array.</returns>
         [Pure]
         public static ImmutableArray<T> Create<T>(T item1, T item2, T item3)
         {
@@ -74,14 +73,14 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Creates an ImmutableArray{T} with the specified elements.
+        /// Creates an <see cref="ImmutableArray{T}"/> with the specified elements.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <param name="item1">The first element to store in the array.</param>
         /// <param name="item2">The second element to store in the array.</param>
         /// <param name="item3">The third element to store in the array.</param>
-        /// <param name="item4">The third element to store in the array.</param>
-        /// <returns>A 1-element array.</returns>
+        /// <param name="item4">The fourth element to store in the array.</param>
+        /// <returns>A 4-element array.</returns>
         [Pure]
         public static ImmutableArray<T> Create<T>(T item1, T item2, T item3, T item4)
         {
@@ -90,7 +89,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Creates an ImmutableArray{T} populated with the contents of the specified sequence.
+        /// Creates an <see cref="ImmutableArray{T}"/> populated with the contents of the specified sequence.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <param name="items">The elements to store in the array.</param>
@@ -109,11 +108,12 @@ namespace System.Collections.Immutable
             {
                 immutableArray.ThrowInvalidOperationIfNotInitialized();
 
-                var existingImmutableArray = immutableArray.Array as T[];
-                if (existingImmutableArray != null || immutableArray.Array == null)
-                {
-                    return new ImmutableArray<T>(existingImmutableArray);
-                }
+                // immutableArray.Array must not be null at this point, and we know it's an
+                // ImmutableArray<T> or ImmutableArray<SomethingDerivedFromT> as they are
+                // the only types that could be both IEnumerable<T> and IImmutableArray.
+                // As such, we know that items is either an ImmutableArray<T> or
+                // ImmutableArray<TypeDerivedFromT>, and we can cast the array to T[].
+                return new ImmutableArray<T>((T[])immutableArray.Array);
             }
 
             // We don't recognize the source as an array that is safe to use.
@@ -141,7 +141,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Creates an empty ImmutableArray{T}.
+        /// Creates an empty <see cref="ImmutableArray{T}"/>.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <param name="items">The elements to store in the array.</param>
@@ -162,7 +162,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray"/> struct.
+        /// Initializes a new instance of the <see cref="ImmutableArray{T}"/> struct.
         /// </summary>
         /// <param name="items">The array to initialize the array with. A defensive copy is made.</param>
         /// <param name="start">The index of the first element in the source array to include in the resulting array.</param>
@@ -194,7 +194,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray"/> struct.
+        /// Initializes a new instance of the <see cref="ImmutableArray{T}"/> struct.
         /// </summary>
         /// <param name="items">The array to initialize the array with.
         /// The selected array segment may be copied into a new array.</param>
@@ -226,13 +226,13 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray&lt;T&gt;" /> struct.
+        /// Initializes a new instance of the <see cref="ImmutableArray{T}"/> struct.
         /// </summary>
         /// <param name="items">The source array to initialize the resulting array with.</param>
         /// <param name="selector">The function to apply to each element from the source array.</param>
         /// <remarks>
-        /// This overload allows efficient creation of an <see cref="ImmutableArray&lt;T&gt;" /> based on an existing
-        /// <see cref="ImmutableArray&lt;T&gt;" />, where a mapping function needs to be applied to each element from
+        /// This overload allows efficient creation of an <see cref="ImmutableArray{T}"/> based on an existing
+        /// <see cref="ImmutableArray{T}"/>, where a mapping function needs to be applied to each element from
         /// the source array.
         /// </remarks>
         [Pure]
@@ -257,15 +257,15 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray&lt;T&gt;" /> struct.
+        /// Initializes a new instance of the <see cref="ImmutableArray{T}"/> struct.
         /// </summary>
         /// <param name="items">The source array to initialize the resulting array with.</param>
         /// <param name="start">The index of the first element in the source array to include in the resulting array.</param>
         /// <param name="length">The number of elements from the source array to include in the resulting array.</param>
         /// <param name="selector">The function to apply to each element from the source array included in the resulting array.</param>
         /// <remarks>
-        /// This overload allows efficient creation of an <see cref="ImmutableArray&lt;T&gt;" /> based on a slice of an existing
-        /// <see cref="ImmutableArray&lt;T&gt;" />, where a mapping function needs to be applied to each element from the source array
+        /// This overload allows efficient creation of an <see cref="ImmutableArray{T}"/> based on a slice of an existing
+        /// <see cref="ImmutableArray{T}"/>, where a mapping function needs to be applied to each element from the source array
         /// included in the resulting array.
         /// </remarks>
         [Pure]
@@ -292,14 +292,14 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray&lt;T&gt;" /> struct.
+        /// Initializes a new instance of the <see cref="ImmutableArray{T}"/> struct.
         /// </summary>
         /// <param name="items">The source array to initialize the resulting array with.</param>
         /// <param name="selector">The function to apply to each element from the source array.</param>
         /// <param name="arg">An argument to be passed to the selector mapping function.</param>
         /// <remarks>
-        /// This overload allows efficient creation of an <see cref="ImmutableArray&lt;T&gt;" /> based on an existing
-        /// <see cref="ImmutableArray&lt;T&gt;" />, where a mapping function needs to be applied to each element from
+        /// This overload allows efficient creation of an <see cref="ImmutableArray{T}"/> based on an existing
+        /// <see cref="ImmutableArray{T}"/>, where a mapping function needs to be applied to each element from
         /// the source array.
         /// </remarks>
         [Pure]
@@ -324,7 +324,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray&lt;T&gt;" /> struct.
+        /// Initializes a new instance of the <see cref="ImmutableArray{T}"/> struct.
         /// </summary>
         /// <param name="items">The source array to initialize the resulting array with.</param>
         /// <param name="start">The index of the first element in the source array to include in the resulting array.</param>
@@ -332,8 +332,8 @@ namespace System.Collections.Immutable
         /// <param name="selector">The function to apply to each element from the source array included in the resulting array.</param>
         /// <param name="arg">An argument to be passed to the selector mapping function.</param>
         /// <remarks>
-        /// This overload allows efficient creation of an <see cref="ImmutableArray&lt;T&gt;" /> based on a slice of an existing
-        /// <see cref="ImmutableArray&lt;T&gt;" />, where a mapping function needs to be applied to each element from the source array
+        /// This overload allows efficient creation of an <see cref="ImmutableArray{T}"/> based on a slice of an existing
+        /// <see cref="ImmutableArray{T}"/>, where a mapping function needs to be applied to each element from the source array
         /// included in the resulting array.
         /// </remarks>
         [Pure]
@@ -360,23 +360,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray"/> struct based on the contents
-        /// of an existing instance, allowing a covariant static cast to efficiently reuse the existing array.
-        /// </summary>
-        /// <param name="items">The array to initialize the array with. No copy is made.</param>
-        /// <remarks>
-        /// Covariant upcasts from this method may be reversed by calling the
-        /// <see cref="ImmutableArray&lt;T&gt;.As&lt;TOther&gt;"/> instance method.
-        /// </remarks>
-        [Pure]
-        public static ImmutableArray<T> Create<T, TDerived>(ImmutableArray<TDerived> items)
-            where TDerived : class, T
-        {
-            return new ImmutableArray<T>(items.array);
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray&lt;T&gt;.Builder"/> class.
+        /// Initializes a new instance of the <see cref="ImmutableArray{T}.Builder"/> class.
         /// </summary>
         /// <typeparam name="T">The type of elements stored in the array.</typeparam>
         /// <returns>A new builder.</returns>
@@ -387,7 +371,7 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray&lt;T&gt;.Builder"/> class.
+        /// Initializes a new instance of the <see cref="ImmutableArray{T}.Builder"/> class.
         /// </summary>
         /// <typeparam name="T">The type of elements stored in the array.</typeparam>
         /// <param name="initialCapacity">The size of the initial array backing the builder.</param>
@@ -416,24 +400,24 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Searches an entire one-dimensional sorted System.Array for a specific element,
-        /// using the System.IComparable&lt;T&gt; generic interface implemented by each element
-        /// of the System.Array and by the specified object.
+        /// Searches an entire one-dimensional sorted <see cref="ImmutableArray{T}"/> for a specific element,
+        /// using the <see cref="IComparable{T}"/> generic interface implemented by each element
+        /// of the <see cref="ImmutableArray{T}"/> and by the specified object.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <param name="array">The sorted, one-dimensional array to search.</param>
         /// <param name="value">The object to search for.</param>
         /// <returns>
-        /// The index of the specified value in the specified array, if value is found.
-        /// If value is not found and value is less than one or more elements in array,
+        /// The index of the specified <paramref name="value"/> in the specified array, if <paramref name="value"/> is found.
+        /// If <paramref name="value"/> is not found and <paramref name="value"/> is less than one or more elements in array,
         /// a negative number which is the bitwise complement of the index of the first
-        /// element that is larger than value. If value is not found and value is greater
+        /// element that is larger than <paramref name="value"/>. If <paramref name="value"/> is not found and <paramref name="value"/> is greater
         /// than any of the elements in array, a negative number which is the bitwise
         /// complement of (the index of the last element plus 1).
         /// </returns>
         /// <exception cref="System.InvalidOperationException">
-        /// value does not implement the System.IComparable&lt;T&gt; generic interface, and
-        /// the search encounters an element that does not implement the System.IComparable&lt;T&gt;
+        /// <paramref name="value"/> does not implement the <see cref="IComparable{T}"/> generic interface, and
+        /// the search encounters an element that does not implement the <see cref="IComparable{T}"/>
         /// generic interface.
         /// </exception>
         [Pure]
@@ -443,28 +427,28 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Searches an entire one-dimensional sorted System.Array for a value using
-        /// the specified System.Collections.Generic.IComparer&lt;T&gt; generic interface.
+        /// Searches an entire one-dimensional sorted <see cref="ImmutableArray{T}"/> for a value using
+        /// the specified <see cref="IComparer{T}"/> generic interface.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <param name="array">The sorted, one-dimensional array to search.</param>
         /// <param name="value">The object to search for.</param>
         /// <param name="comparer">
-        /// The System.Collections.Generic.IComparer&lt;T&gt; implementation to use when comparing
-        /// elements; or null to use the System.IComparable&lt;T&gt; implementation of each
+        /// The <see cref="IComparer{T}"/> implementation to use when comparing
+        /// elements; or null to use the <see cref="IComparable{T}"/> implementation of each
         /// element.
         /// </param>
         /// <returns>
-        /// The index of the specified value in the specified array, if value is found.
-        /// If value is not found and value is less than one or more elements in array,
+        /// The index of the specified <paramref name="value"/> in the specified array, if <paramref name="value"/> is found.
+        /// If <paramref name="value"/> is not found and <paramref name="value"/> is less than one or more elements in array,
         /// a negative number which is the bitwise complement of the index of the first
-        /// element that is larger than value. If value is not found and value is greater
+        /// element that is larger than <paramref name="value"/>. If <paramref name="value"/> is not found and <paramref name="value"/> is greater
         /// than any of the elements in array, a negative number which is the bitwise
         /// complement of (the index of the last element plus 1).
         /// </returns>
         /// <exception cref="System.InvalidOperationException">
-        /// value does not implement the System.IComparable&lt;T&gt; generic interface, and
-        /// the search encounters an element that does not implement the System.IComparable&lt;T&gt;
+        /// <paramref name="comparer"/> is null, <paramref name="value"/> does not implement the <see cref="IComparable{T}"/> generic interface, and
+        /// the search encounters an element that does not implement the <see cref="IComparable{T}"/>
         /// generic interface.
         /// </exception>
         [Pure]
@@ -474,9 +458,9 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Searches a range of elements in a one-dimensional sorted System.Array for
-        /// a value, using the System.IComparable&lt;T&gt; generic interface implemented by
-        /// each element of the System.Array and by the specified value.
+        /// Searches a range of elements in a one-dimensional sorted <see cref="ImmutableArray{T}"/> for
+        /// a value, using the <see cref="IComparable{T}"/> generic interface implemented by
+        /// each element of the <see cref="ImmutableArray{T}"/> and by the specified value.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
         /// <param name="array">The sorted, one-dimensional array to search.</param>
@@ -484,17 +468,23 @@ namespace System.Collections.Immutable
         /// <param name="length">The length of the range to search.</param>
         /// <param name="value">The object to search for.</param>
         /// <returns>
-        /// The index of the specified value in the specified array, if value is found.
-        /// If value is not found and value is less than one or more elements in array,
+        /// The index of the specified <paramref name="value"/> in the specified <paramref name="array"/>, if <paramref name="value"/> is found.
+        /// If <paramref name="value"/> is not found and <paramref name="value"/> is less than one or more elements in <paramref name="array"/>,
         /// a negative number which is the bitwise complement of the index of the first
-        /// element that is larger than value. If value is not found and value is greater
-        /// than any of the elements in array, a negative number which is the bitwise
+        /// element that is larger than <paramref name="value"/>. If <paramref name="value"/> is not found and <paramref name="value"/> is greater
+        /// than any of the elements in <paramref name="array"/>, a negative number which is the bitwise
         /// complement of (the index of the last element plus 1).
         /// </returns>
         /// <exception cref="System.InvalidOperationException">
-        /// value does not implement the System.IComparable&lt;T&gt; generic interface, and
-        /// the search encounters an element that does not implement the System.IComparable&lt;T&gt;
+        /// <paramref name="value"/> does not implement the <see cref="IComparable{T}"/> generic interface, and
+        /// the search encounters an element that does not implement the <see cref="IComparable{T}"/>
         /// generic interface.
+        /// </exception>
+        /// <exception cref="ArgumentException">
+        /// <paramref name="index"/> and <paramref name="length"/> do not specify a valid range in <paramref name="array"/>.
+        /// </exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="index"/> is less than the lower bound of <paramref name="array"/>. -or- <paramref name="length"/> is less than zero.
         /// </exception>
         [Pure]
         public static int BinarySearch<T>(this ImmutableArray<T> array, int index, int length, T value)
@@ -503,8 +493,8 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Searches a range of elements in a one-dimensional sorted System.Array for
-        /// a value, using the specified System.Collections.Generic.IComparer&lt;T&gt; generic
+        /// Searches a range of elements in a one-dimensional sorted <see cref="ImmutableArray{T}"/> for
+        /// a value, using the specified <see cref="IComparer{T}"/> generic
         /// interface.
         /// </summary>
         /// <typeparam name="T">The type of element stored in the array.</typeparam>
@@ -513,29 +503,29 @@ namespace System.Collections.Immutable
         /// <param name="length">The length of the range to search.</param>
         /// <param name="value">The object to search for.</param>
         /// <param name="comparer">
-        /// The System.Collections.Generic.IComparer&lt;T&gt; implementation to use when comparing
-        /// elements; or null to use the System.IComparable&lt;T&gt; implementation of each
+        /// The <see cref="IComparer{T}"/> implementation to use when comparing
+        /// elements; or null to use the <see cref="IComparable{T}"/> implementation of each
         /// element.
         /// </param>
         /// <returns>
-        /// The index of the specified value in the specified array, if value is found.
-        /// If value is not found and value is less than one or more elements in array,
+        /// The index of the specified <paramref name="value"/> in the specified <paramref name="array"/>, if <paramref name="value"/> is found.
+        /// If <paramref name="value"/> is not found and <paramref name="value"/> is less than one or more elements in <paramref name="array"/>,
         /// a negative number which is the bitwise complement of the index of the first
-        /// element that is larger than value. If value is not found and value is greater
-        /// than any of the elements in array, a negative number which is the bitwise
+        /// element that is larger than <paramref name="value"/>. If <paramref name="value"/> is not found and <paramref name="value"/> is greater
+        /// than any of the elements in <paramref name="array"/>, a negative number which is the bitwise
         /// complement of (the index of the last element plus 1).
         /// </returns>
         /// <exception cref="System.InvalidOperationException">
-        /// comparer is null, value does not implement the System.IComparable&lt;T&gt; generic
+        /// <paramref name="comparer"/> is null, <paramref name="value"/> does not implement the <see cref="IComparable{T}"/> generic
         /// interface, and the search encounters an element that does not implement the
-        /// System.IComparable&lt;T&gt; generic interface.
+        /// <see cref="IComparable{T}"/> generic interface.
         /// </exception>
         /// <exception cref="ArgumentException">
-        /// index and length do not specify a valid range in array.-or-comparer is null,
-        /// and value is of a type that is not compatible with the elements of array.
+        /// <paramref name="index"/> and <paramref name="length"/> do not specify a valid range in <paramref name="array"/>.-or-<paramref name="comparer"/> is null,
+        /// and <paramref name="value"/> is of a type that is not compatible with the elements of <paramref name="array"/>.
         /// </exception>
         /// <exception cref="ArgumentOutOfRangeException">
-        /// index is less than the lower bound of array. -or- length is less than zero.
+        /// <paramref name="index"/> is less than the lower bound of <paramref name="array"/>. -or- <paramref name="length"/> is less than zero.
         /// </exception>
         [Pure]
         public static int BinarySearch<T>(this ImmutableArray<T> array, int index, int length, T value, IComparer<T> comparer)
@@ -544,16 +534,12 @@ namespace System.Collections.Immutable
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableArray"/> struct.
+        /// Initializes a new instance of the <see cref="ImmutableArray{T}"/> struct.
         /// </summary>
-        /// <param name="items">The array to use or copy from. May be null for "default" arrays.</param>
+        /// <param name="items">The array from which to copy.</param>
         internal static ImmutableArray<T> CreateDefensiveCopy<T>(T[] items)
         {
-            // Some folks lazily initialize fields containing these structs, so retaining a null vs. empty array status is useful.
-            if (items == null)
-            {
-                return default(ImmutableArray<T>);
-            }
+            Debug.Assert(items != null);
 
             if (items.Length == 0)
             {
@@ -562,7 +548,7 @@ namespace System.Collections.Immutable
 
             // defensive copy
             var tmp = new T[items.Length];
-            Array.Copy(items, tmp, items.Length);
+            Array.Copy(items, 0, tmp, 0, items.Length);
             return new ImmutableArray<T>(tmp);
         }
     }

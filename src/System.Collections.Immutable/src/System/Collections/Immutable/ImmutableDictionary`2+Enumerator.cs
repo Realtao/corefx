@@ -1,16 +1,12 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace System.Collections.Immutable
 {
     /// <content>
-    /// Contains the inner Enumerator struct.
+    /// Contains the inner <see cref="ImmutableDictionary{TKey, TValue}.Enumerator"/> struct.
     /// </content>
     public partial class ImmutableDictionary<TKey, TValue>
     {
@@ -22,34 +18,34 @@ namespace System.Collections.Immutable
             /// <summary>
             /// The builder being enumerated, if applicable.
             /// </summary>
-            private readonly Builder builder;
+            private readonly Builder _builder;
 
             /// <summary>
             /// The enumerator over the sorted dictionary whose keys are hash values.
             /// </summary>
-            private ImmutableSortedDictionary<int, HashBucket>.Enumerator mapEnumerator;
+            private SortedInt32KeyNode<HashBucket>.Enumerator _mapEnumerator;
 
             /// <summary>
-            /// The enumerator in use within an individual HashBucket.
+            /// The enumerator in use within an individual <see cref="HashBucket"/>.
             /// </summary>
-            private HashBucket.Enumerator bucketEnumerator;
+            private HashBucket.Enumerator _bucketEnumerator;
 
             /// <summary>
             /// The version of the builder (when applicable) that is being enumerated.
             /// </summary>
-            private int enumeratingBuilderVersion;
+            private int _enumeratingBuilderVersion;
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="ImmutableDictionary&lt;TKey, TValue&gt;.Enumerator"/> struct.
+            /// Initializes a new instance of the <see cref="ImmutableDictionary{TKey, TValue}.Enumerator"/> struct.
             /// </summary>
             /// <param name="root">The root.</param>
             /// <param name="builder">The builder, if applicable.</param>
-            internal Enumerator(ImmutableSortedDictionary<int, HashBucket>.Node root, Builder builder = null)
+            internal Enumerator(SortedInt32KeyNode<HashBucket> root, Builder builder = null)
             {
-                this.builder = builder;
-                this.mapEnumerator = new ImmutableSortedDictionary<int, HashBucket>.Enumerator(root);
-                this.bucketEnumerator = default(HashBucket.Enumerator);
-                this.enumeratingBuilderVersion = builder != null ? builder.Version : -1;
+                _builder = builder;
+                _mapEnumerator = new SortedInt32KeyNode<HashBucket>.Enumerator(root);
+                _bucketEnumerator = default(HashBucket.Enumerator);
+                _enumeratingBuilderVersion = builder != null ? builder.Version : -1;
             }
 
             /// <summary>
@@ -59,8 +55,8 @@ namespace System.Collections.Immutable
             {
                 get
                 {
-                    this.mapEnumerator.ThrowIfDisposed();
-                    return this.bucketEnumerator.Current;
+                    _mapEnumerator.ThrowIfDisposed();
+                    return _bucketEnumerator.Current;
                 }
             }
 
@@ -78,20 +74,20 @@ namespace System.Collections.Immutable
             /// <returns>
             /// true if the enumerator was successfully advanced to the next element; false if the enumerator has passed the end of the collection.
             /// </returns>
-            /// <exception cref="T:System.InvalidOperationException">The collection was modified after the enumerator was created. </exception>
+            /// <exception cref="InvalidOperationException">The collection was modified after the enumerator was created. </exception>
             public bool MoveNext()
             {
                 this.ThrowIfChanged();
 
-                if (this.bucketEnumerator.MoveNext())
+                if (_bucketEnumerator.MoveNext())
                 {
                     return true;
                 }
 
-                if (this.mapEnumerator.MoveNext())
+                if (_mapEnumerator.MoveNext())
                 {
-                    this.bucketEnumerator = new HashBucket.Enumerator(this.mapEnumerator.Current.Value);
-                    return this.bucketEnumerator.MoveNext();
+                    _bucketEnumerator = new HashBucket.Enumerator(_mapEnumerator.Current.Value);
+                    return _bucketEnumerator.MoveNext();
                 }
 
                 return false;
@@ -100,15 +96,15 @@ namespace System.Collections.Immutable
             /// <summary>
             /// Sets the enumerator to its initial position, which is before the first element in the collection.
             /// </summary>
-            /// <exception cref="T:System.InvalidOperationException">The collection was modified after the enumerator was created. </exception>
+            /// <exception cref="InvalidOperationException">The collection was modified after the enumerator was created. </exception>
             public void Reset()
             {
-                this.enumeratingBuilderVersion = builder != null ? builder.Version : -1;
-                this.mapEnumerator.Reset();
+                _enumeratingBuilderVersion = _builder != null ? _builder.Version : -1;
+                _mapEnumerator.Reset();
 
-                // Reseting the bucket enumerator is pointless because we'll start on a new bucket later anyway.
-                this.bucketEnumerator.Dispose();
-                this.bucketEnumerator = default(HashBucket.Enumerator);
+                // Resetting the bucket enumerator is pointless because we'll start on a new bucket later anyway.
+                _bucketEnumerator.Dispose();
+                _bucketEnumerator = default(HashBucket.Enumerator);
             }
 
             /// <summary>
@@ -116,8 +112,8 @@ namespace System.Collections.Immutable
             /// </summary>
             public void Dispose()
             {
-                this.mapEnumerator.Dispose();
-                this.bucketEnumerator.Dispose();
+                _mapEnumerator.Dispose();
+                _bucketEnumerator.Dispose();
             }
 
             /// <summary>
@@ -126,9 +122,9 @@ namespace System.Collections.Immutable
             /// <exception cref="System.InvalidOperationException">Thrown if the collection has changed.</exception>
             private void ThrowIfChanged()
             {
-                if (this.builder != null && this.builder.Version != this.enumeratingBuilderVersion)
+                if (_builder != null && _builder.Version != _enumeratingBuilderVersion)
                 {
-                    throw new InvalidOperationException(Strings.CollectionModifiedDuringEnumeration);
+                    throw new InvalidOperationException(SR.CollectionModifiedDuringEnumeration);
                 }
             }
         }

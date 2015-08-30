@@ -8,48 +8,38 @@ namespace System.Reflection.Metadata
 {
     public struct DeclarativeSecurityAttribute
     {
-        private readonly MetadataReader reader;
+        private readonly MetadataReader _reader;
 
         // Workaround: JIT doesn't generate good code for nested structures, so use RowId.
-        private readonly uint rowId;
+        private readonly int _rowId;
 
-        internal DeclarativeSecurityAttribute(MetadataReader reader, uint rowId)
+        internal DeclarativeSecurityAttribute(MetadataReader reader, int rowId)
         {
             Debug.Assert(reader != null);
             Debug.Assert(rowId != 0);
 
-            this.reader = reader;
-            this.rowId = rowId;
-        }
-
-        private uint RowId
-        {
-            get { return rowId & TokenTypeIds.RIDMask; }
+            _reader = reader;
+            _rowId = rowId;
         }
 
         private DeclarativeSecurityAttributeHandle Handle
         {
-            get { return DeclarativeSecurityAttributeHandle.FromRowId(RowId); }
-        }
-
-        private MethodDefTreatment Treatment
-        {
-            get { return (MethodDefTreatment)(rowId >> TokenTypeIds.RowIdBitCount); }
+            get { return DeclarativeSecurityAttributeHandle.FromRowId(_rowId); }
         }
 
         public DeclarativeSecurityAction Action
         {
             get
             {
-                return reader.DeclSecurityTable.GetAction(rowId);
+                return _reader.DeclSecurityTable.GetAction(_rowId);
             }
         }
 
-        public Handle Parent
+        public EntityHandle Parent
         {
             get
             {
-                return reader.DeclSecurityTable.GetParent(rowId);
+                return _reader.DeclSecurityTable.GetParent(_rowId);
             }
         }
 
@@ -57,7 +47,7 @@ namespace System.Reflection.Metadata
         {
             get
             {
-                return reader.DeclSecurityTable.GetPermissionSet(rowId);
+                return _reader.DeclSecurityTable.GetPermissionSet(_rowId);
             }
         }
     }

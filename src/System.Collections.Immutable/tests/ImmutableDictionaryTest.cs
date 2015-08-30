@@ -1,12 +1,9 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading;
-
 using Xunit;
 
 namespace System.Collections.Immutable.Test
@@ -265,6 +262,15 @@ namespace System.Collections.Immutable.Test
         }
 
         [Fact]
+        public void CollisionExceptionMessageContainsKey()
+        {
+            var map = ImmutableDictionary.Create<string, string>()
+                .Add("firstKey", "1").Add("secondKey", "2");
+            var exception = Assert.Throws<ArgumentException>(() => map.Add("firstKey", "3"));
+            Assert.Contains("firstKey", exception.Message);
+        }
+
+        [Fact]
         public void WithComparersEmptyCollection()
         {
             var map = ImmutableDictionary.Create<string, string>();
@@ -322,6 +328,16 @@ namespace System.Collections.Immutable.Test
             enumerator.Dispose();
         }
 
+        [Fact]
+        public void DebuggerAttributesValid()
+        {
+            DebuggerAttributes.ValidateDebuggerDisplayReferences(ImmutableDictionary.Create<int, int>());
+            DebuggerAttributes.ValidateDebuggerTypeProxyProperties(ImmutableDictionary.Create<string, int>());
+
+            object rootNode = DebuggerAttributes.GetFieldValue(ImmutableDictionary.Create<string, string>(), "_root");
+            DebuggerAttributes.ValidateDebuggerDisplayReferences(rootNode);
+        }
+
         protected override IImmutableDictionary<TKey, TValue> Empty<TKey, TValue>()
         {
             return ImmutableDictionaryTest.Empty<TKey, TValue>();
@@ -335,6 +351,11 @@ namespace System.Collections.Immutable.Test
         protected override IEqualityComparer<TValue> GetValueComparer<TKey, TValue>(IImmutableDictionary<TKey, TValue> dictionary)
         {
             return ((ImmutableDictionary<TKey, TValue>)dictionary).ValueComparer;
+        }
+
+        internal override IBinaryTree GetRootNode<TKey, TValue>(IImmutableDictionary<TKey, TValue> dictionary)
+        {
+            return ((ImmutableDictionary<TKey, TValue>)dictionary).Root;
         }
 
         protected void ContainsValueTestHelper<TKey, TValue>(ImmutableDictionary<TKey, TValue> map, TKey key, TValue value)

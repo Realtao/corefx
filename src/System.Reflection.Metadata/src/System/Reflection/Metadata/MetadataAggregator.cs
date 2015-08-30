@@ -11,9 +11,9 @@ namespace System.Reflection.Metadata.Ecma335
     {
         // For each heap handle and each delta contains aggregate heap lengths.
         // heapSizes[heap kind][reader index] == Sum { 0..index | reader[i].XxxHeapLength }
-        private readonly ImmutableArray<ImmutableArray<int>> heapSizes;
+        private readonly ImmutableArray<ImmutableArray<int>> _heapSizes;
 
-        private readonly ImmutableArray<ImmutableArray<RowCounts>> rowCounts;
+        private readonly ImmutableArray<ImmutableArray<RowCounts>> _rowCounts;
 
         // internal for testing
         internal struct RowCounts : IComparable<RowCounts>
@@ -101,15 +101,15 @@ namespace System.Reflection.Metadata.Ecma335
                 }
             }
 
-            this.heapSizes = CalculateHeapSizes(baseHeapSizes, deltaReaders);
-            this.rowCounts = CalculateRowCounts(baseTableRowCounts, deltaReaders);
+            _heapSizes = CalculateHeapSizes(baseHeapSizes, deltaReaders);
+            _rowCounts = CalculateRowCounts(baseTableRowCounts, deltaReaders);
         }
 
         // for testing only
         internal MetadataAggregator(RowCounts[][] rowCounts, int[][] heapSizes)
         {
-            this.rowCounts = ToImmutable(rowCounts);
-            this.heapSizes = ToImmutable(heapSizes);
+            _rowCounts = ToImmutable(rowCounts);
+            _heapSizes = ToImmutable(heapSizes);
         }
 
         private static void CalculateBaseCounts(
@@ -215,8 +215,8 @@ namespace System.Reflection.Metadata.Ecma335
                 tableRowCounts[generation].AggregateInserts = tableRowCounts[generation - 1].AggregateInserts;
             }
 
-            int mapRowCount = (int)encMapTable.NumberOfRows;
-            for (uint mapRid = 1; mapRid <= mapRowCount; mapRid++)
+            int mapRowCount = encMapTable.NumberOfRows;
+            for (int mapRid = 1; mapRid <= mapRowCount; mapRid++)
             {
                 uint token = encMapTable.GetToken(mapRid);
                 int rid = (int)(token & TokenTypeIds.RIDMask);
@@ -227,7 +227,7 @@ namespace System.Reflection.Metadata.Ecma335
                 {
                     if (rid != tableRowCounts[generation].AggregateInserts + 1)
                     {
-                        throw new BadImageFormatException(MetadataResources.EnCMapNotSorted);
+                        throw new BadImageFormatException(SR.EnCMapNotSorted);
                     }
 
                     // insert:
@@ -250,28 +250,26 @@ namespace System.Reflection.Metadata.Ecma335
                 throw new NotSupportedException();
             }
 
-            int rowId = (int)handle.RowId;
-            uint typeId = handle.TokenType;
-            int relativeRowId;
-
             if (handle.IsHeapHandle)
             {
+                int heapOffset = handle.Offset;
+
                 HeapIndex heapIndex;
                 MetadataTokens.TryGetHeapIndex(handle.Kind, out heapIndex);
 
-                var sizes = heapSizes[(int)heapIndex];
+                var sizes = _heapSizes[(int)heapIndex];
 
-                generation = sizes.BinarySearch(rowId);
+                generation = sizes.BinarySearch(heapOffset);
                 if (generation >= 0)
                 {
-                    Debug.Assert(sizes[generation] == rowId);
+                    Debug.Assert(sizes[generation] == heapOffset);
 
                     // the index points to the start of the next generation that added data to the heap:
                     do
                     {
                         generation++;
                     }
-                    while (generation < sizes.Length && sizes[generation] == rowId);
+                    while (generation < sizes.Length && sizes[generation] == heapOffset);
                 }
                 else
                 {
@@ -280,15 +278,19 @@ namespace System.Reflection.Metadata.Ecma335
 
                 if (generation >= sizes.Length)
                 {
-                    throw new ArgumentException("Handle belongs to a future generation", "handle");
+                    throw new ArgumentException(SR.HandleBelongsToFutureGeneration, "handle");
                 }
 
                 // GUID heap accumulates - previous heap is copied to the next generation 
-                relativeRowId = (typeId == TokenTypeIds.Guid || generation == 0) ? rowId : rowId - sizes[generation - 1];
+                int relativeHeapOffset = (handle.Type == HandleType.Guid || generation == 0) ? heapOffset : heapOffset - sizes[generation - 1];
+
+                return new Handle((byte)handle.Type, relativeHeapOffset);
             }
             else
             {
-                var sizes = rowCounts[(int)handle.value >> TokenTypeIds.RowIdBitCount];
+                int rowId = handle.RowId;
+
+                var sizes = _rowCounts[(int)handle.Type];
 
                 generation = sizes.BinarySearch(new RowCounts { AggregateInserts = rowId });
                 if (generation >= 0)
@@ -296,7 +298,7 @@ namespace System.Reflection.Metadata.Ecma335
                     Debug.Assert(sizes[generation].AggregateInserts == rowId);
 
                     // the row is in a generation that inserted exactly one row -- the one that we are looking for;
-                    // or it's in a preceeding generation if the current one didn't insert any rows of the kind:
+                    // or it's in a preceding generation if the current one didn't insert any rows of the kind:
                     while (generation > 0 && sizes[generation - 1].AggregateInserts == rowId)
                     {
                         generation--;
@@ -309,18 +311,18 @@ namespace System.Reflection.Metadata.Ecma335
 
                     if (generation >= sizes.Length)
                     {
-                        throw new ArgumentException("Handle belongs to a future generation", "handle");
+                        throw new ArgumentException(SR.HandleBelongsToFutureGeneration, "handle");
                     }
                 }
 
                 // In each delta table updates always precede inserts.
-                relativeRowId = (generation == 0) ? rowId :
+                int relativeRowId = (generation == 0) ? rowId :
                     rowId -
                     sizes[generation - 1].AggregateInserts +
                     sizes[generation].Updates;
-            }
 
-            return new Handle(typeId | (uint)relativeRowId);
+                return new Handle((byte)handle.Type, relativeRowId);
+            }
         }
     }
 }

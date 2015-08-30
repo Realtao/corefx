@@ -1,17 +1,12 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Collections.Generic;
-using System.Diagnostics.Contracts;
-using System.Linq;
-using System.Text;
 using Validation;
 
 namespace System.Collections.Immutable
 {
     /// <content>
-    /// Contains the inner MutationResult class.
+    /// Contains the inner <see cref="ImmutableDictionary{TKey, TValue}.MutationResult"/> class.
     /// </content>
     public partial class ImmutableDictionary<TKey, TValue>
     {
@@ -23,41 +18,41 @@ namespace System.Collections.Immutable
             /// <summary>
             /// The root node of the data structure after the mutation.
             /// </summary>
-            private readonly ImmutableSortedDictionary<int, HashBucket>.Node root;
+            private readonly SortedInt32KeyNode<HashBucket> _root;
 
             /// <summary>
             /// The number of elements added or removed from the collection as a result of the operation (a negative number represents removed elements).
             /// </summary>
-            private readonly int countAdjustment;
+            private readonly int _countAdjustment;
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="ImmutableDictionary&lt;TKey, TValue&gt;.MutationResult"/> struct.
+            /// Initializes a new instance of the <see cref="ImmutableDictionary{TKey, TValue}.MutationResult"/> struct.
             /// </summary>
             /// <param name="unchangedInput">The unchanged input.</param>
             internal MutationResult(MutationInput unchangedInput)
             {
-                this.root = unchangedInput.Root;
-                this.countAdjustment = 0;
+                _root = unchangedInput.Root;
+                _countAdjustment = 0;
             }
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="ImmutableDictionary&lt;TKey, TValue&gt;.MutationResult"/> struct.
+            /// Initializes a new instance of the <see cref="ImmutableDictionary{TKey, TValue}.MutationResult"/> struct.
             /// </summary>
             /// <param name="root">The root.</param>
             /// <param name="countAdjustment">The count adjustment.</param>
-            internal MutationResult(ImmutableSortedDictionary<int, HashBucket>.Node root, int countAdjustment)
+            internal MutationResult(SortedInt32KeyNode<HashBucket> root, int countAdjustment)
             {
                 Requires.NotNull(root, "root");
-                this.root = root;
-                this.countAdjustment = countAdjustment;
+                _root = root;
+                _countAdjustment = countAdjustment;
             }
 
             /// <summary>
             /// Gets the root node of the data structure after the mutation.
             /// </summary>
-            internal ImmutableSortedDictionary<int, HashBucket>.Node Root
+            internal SortedInt32KeyNode<HashBucket> Root
             {
-                get { return this.root; }
+                get { return _root; }
             }
 
             /// <summary>
@@ -65,7 +60,7 @@ namespace System.Collections.Immutable
             /// </summary>
             internal int CountAdjustment
             {
-                get { return this.countAdjustment; }
+                get { return _countAdjustment; }
             }
 
             /// <summary>
@@ -76,7 +71,7 @@ namespace System.Collections.Immutable
             internal ImmutableDictionary<TKey, TValue> Finalize(ImmutableDictionary<TKey, TValue> priorMap)
             {
                 Requires.NotNull(priorMap, "priorMap");
-                return priorMap.Wrap(this.Root, priorMap.count + this.CountAdjustment);
+                return priorMap.Wrap(this.Root, priorMap._count + this.CountAdjustment);
             }
         }
     }

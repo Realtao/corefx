@@ -2,11 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 // This file is auto-generated, do not make permanent modifications.
 
-using System;
 using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace System.Numerics
@@ -30,7 +28,7 @@ namespace System.Numerics
     *        2. Allows reflection to work:
     *            - If a method is called via reflection, it will not be "intrinsified", which would cause issues if we did
     *              not provide an implementation for that case (i.e. if it only included a case which assumed 16-byte registers)
-    *    (NOTE: It is assumed that Vector.IsHardwareAccelerated will be a compile-time constant, eliminating these checks 
+    *    (NOTE: It is assumed that Vector.IsHardwareAccelerated will be a compile-time constant, eliminating these checks
     *        from the JIT'd code.)
     *
     * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -55,27 +53,20 @@ namespace System.Numerics
         {
             get
             {
-                if (Vector.IsHardwareAccelerated)
-                {
-                    throw new NotSupportedException(SR.GetString("Reflection_MethodNotSupported"));
-                }
-                else
-                {
-                    return count;
-                }
+                return s_count;
             }
         }
-        private static int count = InitializeCount();
+        private static int s_count = InitializeCount();
 
-        /// <summary> 
-        /// Returns a vector containing all zeroes. 
+        /// <summary>
+        /// Returns a vector containing all zeroes.
         /// </summary>
         [JitIntrinsic]
         public static Vector<T> Zero { get { return zero; } }
         private static readonly Vector<T> zero = new Vector<T>(GetZeroValue());
 
-        /// <summary> 
-        /// Returns a vector containing all ones. 
+        /// <summary>
+        /// Returns a vector containing all ones.
         /// </summary>
         [JitIntrinsic]
         public static Vector<T> One { get { return one; } }
@@ -86,55 +77,67 @@ namespace System.Numerics
         #endregion Static Members
 
         #region Static Initialization
-        private static int InitializeCount()
+        private struct VectorSizeHelper
         {
-            Contract.Requires(
-                Vector.IsHardwareAccelerated == false,
-                "InitializeCount cannot be invoked when running under hardware acceleration");
+            internal Vector<T> _placeholder;
+            internal byte _byte;
+        }
+
+		// Calculates the size of this struct in bytes, by computing the offset of a field in a structure
+        private static unsafe int InitializeCount()
+        {
+            VectorSizeHelper vsh;
+            byte* vectorBase = &vsh._placeholder.register.byte_0;
+            byte* byteBase = &vsh._byte;
+            int vectorSizeInBytes = (int)(byteBase - vectorBase);
+
+            int typeSizeInBytes = -1;
             if (typeof(T) == typeof(Byte))
             {
-                return 16;
+                typeSizeInBytes = sizeof(Byte);
             }
             else if (typeof(T) == typeof(SByte))
             {
-                return 16;
+                typeSizeInBytes = sizeof(SByte);
             }
             else if (typeof(T) == typeof(UInt16))
             {
-                return 8;
+                typeSizeInBytes = sizeof(UInt16);
             }
             else if (typeof(T) == typeof(Int16))
             {
-                return 8;
+                typeSizeInBytes = sizeof(Int16);
             }
             else if (typeof(T) == typeof(UInt32))
             {
-                return 4;
+                typeSizeInBytes = sizeof(UInt32);
             }
             else if (typeof(T) == typeof(Int32))
             {
-                return 4;
+                typeSizeInBytes = sizeof(Int32);
             }
             else if (typeof(T) == typeof(UInt64))
             {
-                return 2;
+                typeSizeInBytes = sizeof(UInt64);
             }
             else if (typeof(T) == typeof(Int64))
             {
-                return 2;
+                typeSizeInBytes = sizeof(Int64);
             }
             else if (typeof(T) == typeof(Single))
             {
-                return 4;
+                typeSizeInBytes = sizeof(Single);
             }
             else if (typeof(T) == typeof(Double))
             {
-                return 2;
+                typeSizeInBytes = sizeof(Double);
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
+
+            return vectorSizeInBytes / typeSizeInBytes;
         }
         #endregion Static Initialization
 
@@ -350,14 +353,14 @@ namespace System.Numerics
             }
         }
 
-        /// <summary> 
+        /// <summary>
         /// Constructs a vector from the given array. The size of the given array must be at least Vector'T.Count.
         /// </summary>
         [JitIntrinsic]
         public unsafe Vector(T[] values) : this(values, 0) { }
 
-        /// <summary> 
-        /// Constructs a vector from the given array, starting from the given index. 
+        /// <summary>
+        /// Constructs a vector from the given array, starting from the given index.
         /// The array must contain at least Vector'T.Count from the given index.
         /// </summary>
         public unsafe Vector(T[] values, int index)
@@ -365,7 +368,8 @@ namespace System.Numerics
         {
             if (values == null)
             {
-                throw new ArgumentNullException("values");
+                // Match the JIT's exception type here. For perf, a NullReference is thrown instead of an ArgumentNull.
+                throw new NullReferenceException(SR.Arg_NullArgumentNullRef);
             }
             if (index < 0 || (values.Length - index) < Count)
             {
@@ -737,7 +741,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 #pragma warning restore 3001 // void* is not a CLS-Compliant argument type
@@ -749,7 +753,7 @@ namespace System.Numerics
         #endregion Constructors
 
         #region Public Instance Methods
-        /// <summary> 
+        /// <summary>
         /// Copies the vector to the given destination array. The destination array must be at least size Vector'T.Count.
         /// </summary>
         /// <param name="destination">The destination array which the values are copied into</param>
@@ -761,7 +765,7 @@ namespace System.Numerics
             CopyTo(destination, 0);
         }
 
-        /// <summary> 
+        /// <summary>
         /// Copies the vector to the given destination array. The destination array must be at least size Vector'T.Count.
         /// </summary>
         /// <param name="destination">The destination array which the values are copied into</param>
@@ -774,15 +778,16 @@ namespace System.Numerics
         {
             if (destination == null)
             {
-                throw new ArgumentNullException("values");
+                // Match the JIT's exception type here. For perf, a NullReference is thrown instead of an ArgumentNull.
+                throw new NullReferenceException(SR.Arg_NullArgumentNullRef);
             }
             if (startIndex < 0 || startIndex >= destination.Length)
             {
-                throw new ArgumentOutOfRangeException(SR.GetString("Arg_ArgumentOutOfRangeException", startIndex));
+                throw new ArgumentOutOfRangeException(SR.Format(SR.Arg_ArgumentOutOfRangeException, startIndex));
             }
             if ((destination.Length - startIndex) < Count)
             {
-                throw new ArgumentException(SR.GetString("Arg_ElementsInSourceIsGreaterThanDestination", startIndex));
+                throw new ArgumentException(SR.Format(SR.Arg_ElementsInSourceIsGreaterThanDestination, startIndex));
             }
 
             if (Vector.IsHardwareAccelerated)
@@ -1039,7 +1044,7 @@ namespace System.Numerics
             }
         }
 
-        /// <summary> 
+        /// <summary>
         /// Returns the element at the given index.
         /// </summary>
         [JitIntrinsic]
@@ -1049,7 +1054,7 @@ namespace System.Numerics
             {
                 if (index >= Count || index < 0)
                 {
-                    throw new IndexOutOfRangeException(SR.GetString("Arg_ArgumentOutOfRangeException", index));
+                    throw new IndexOutOfRangeException(SR.Format(SR.Arg_ArgumentOutOfRangeException, index));
                 }
                 if (typeof(T) == typeof(Byte))
                 {
@@ -1123,7 +1128,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -1136,7 +1141,7 @@ namespace System.Numerics
         [MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
         public override bool Equals(object obj)
         {
-            if (obj == null || !(obj is Vector<T>))
+            if (!(obj is Vector<T>))
             {
                 return false;
             }
@@ -1272,7 +1277,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -1369,7 +1374,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
             else
@@ -1482,7 +1487,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -1507,7 +1512,7 @@ namespace System.Numerics
         }
 
         /// <summary>
-        /// Returns a String representing this vector, using the specified format string to format individual elements 
+        /// Returns a String representing this vector, using the specified format string to format individual elements
         /// and the given IFormatProvider.
         /// </summary>
         /// <param name="format">The format of individual elements.</param>
@@ -1516,16 +1521,17 @@ namespace System.Numerics
         public string ToString(string format, IFormatProvider formatProvider)
         {
             StringBuilder sb = new StringBuilder();
-            string separator = NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator + " ";
-            sb.Append("<");
+            string separator = NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator;
+            sb.Append('<');
             for (int g = 0; g < Count - 1; g++)
             {
                 sb.Append(((IFormattable)this[g]).ToString(format, formatProvider));
                 sb.Append(separator);
+                sb.Append(' ');
             }
             // Append last element w/out separator
             sb.Append(((IFormattable)this[Count - 1]).ToString(format, formatProvider));
-            sb.Append(">");
+            sb.Append('>');
             return sb.ToString();
         }
         #endregion Public Instance Methods
@@ -1635,7 +1641,7 @@ namespace System.Numerics
                     }
                     else
                     {
-                        throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                        throw new NotSupportedException(SR.Arg_TypeNotSupported);
                     }
                 }
                 else
@@ -1846,7 +1852,7 @@ namespace System.Numerics
                     }
                     else
                     {
-                        throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                        throw new NotSupportedException(SR.Arg_TypeNotSupported);
                     }
                 }
                 else
@@ -2058,7 +2064,7 @@ namespace System.Numerics
                     }
                     else
                     {
-                        throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                        throw new NotSupportedException(SR.Arg_TypeNotSupported);
                     }
                 }
                 else
@@ -2508,7 +2514,7 @@ namespace System.Numerics
                     }
                     else
                     {
-                        throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                        throw new NotSupportedException(SR.Arg_TypeNotSupported);
                     }
                 }
                 else
@@ -2974,7 +2980,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
             else
@@ -3088,7 +3094,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -3191,7 +3197,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
             else
@@ -3305,7 +3311,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -3408,7 +3414,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
             else
@@ -3522,7 +3528,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -3624,7 +3630,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
             else
@@ -3691,7 +3697,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -3793,7 +3799,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
             else
@@ -3907,7 +3913,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -4009,7 +4015,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
             else
@@ -4123,7 +4129,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -4260,7 +4266,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -4362,7 +4368,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
             else
@@ -4475,7 +4481,7 @@ namespace System.Numerics
                 }
                 else
                 {
-                    throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                    throw new NotSupportedException(SR.Arg_TypeNotSupported);
                 }
             }
         }
@@ -4527,7 +4533,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 
@@ -4576,7 +4582,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 
@@ -4625,7 +4631,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 
@@ -4674,7 +4680,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 
@@ -4723,7 +4729,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 
@@ -4772,7 +4778,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 
@@ -4821,7 +4827,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 
@@ -4880,7 +4886,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 
@@ -4939,7 +4945,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
 
@@ -4988,7 +4994,7 @@ namespace System.Numerics
             }
             else
             {
-                throw new NotSupportedException(SR.GetString("Arg_TypeNotSupported", typeof(T)));
+                throw new NotSupportedException(SR.Arg_TypeNotSupported);
             }
         }
         #endregion

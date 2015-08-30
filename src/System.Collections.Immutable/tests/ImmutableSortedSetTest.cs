@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using Xunit;
@@ -33,7 +33,7 @@ namespace System.Collections.Immutable.Test
             var actual = ImmutableSortedSet<int>.Empty;
 
             int seed = (int)DateTime.Now.Ticks;
-            Console.WriteLine("Using random seed {0}", seed);
+            Debug.WriteLine("Using random seed {0}", seed);
             var random = new Random(seed);
 
             for (int iOp = 0; iOp < operationCount; iOp++)
@@ -42,14 +42,14 @@ namespace System.Collections.Immutable.Test
                 {
                     case Operation.Add:
                         int value = random.Next();
-                        Console.WriteLine("Adding \"{0}\" to the set.", value);
+                        Debug.WriteLine("Adding \"{0}\" to the set.", value);
                         expected.Add(value);
                         actual = actual.Add(value);
                         break;
                     case Operation.Union:
                         int inputLength = random.Next(100);
                         int[] values = Enumerable.Range(0, inputLength).Select(i => random.Next()).ToArray();
-                        Console.WriteLine("Adding {0} elements to the set.", inputLength);
+                        Debug.WriteLine("Adding {0} elements to the set.", inputLength);
                         expected.UnionWith(values);
                         actual = actual.Union(values);
                         break;
@@ -58,7 +58,7 @@ namespace System.Collections.Immutable.Test
                         {
                             int position = random.Next(expected.Count);
                             int element = expected.Skip(position).First();
-                            Console.WriteLine("Removing element \"{0}\" from the set.", element);
+                            Debug.WriteLine("Removing element \"{0}\" from the set.", element);
                             Assert.True(expected.Remove(element));
                             actual = actual.Remove(element);
                         }
@@ -66,7 +66,7 @@ namespace System.Collections.Immutable.Test
                         break;
                     case Operation.Except:
                         var elements = expected.Where(el => random.Next(2) == 0).ToArray();
-                        Console.WriteLine("Removing {0} elements from the set.", elements.Length);
+                        Debug.WriteLine("Removing {0} elements from the set.", elements.Length);
                         expected.ExceptWith(elements);
                         actual = actual.Except(elements);
                         break;
@@ -77,6 +77,7 @@ namespace System.Collections.Immutable.Test
         }
 
         [Fact]
+        [ActiveIssue(780)]
         public void EmptyTest()
         {
             this.EmptyTestHelper(Empty<int>(), 5, null);
@@ -121,11 +122,49 @@ namespace System.Collections.Immutable.Test
         }
 
         [Fact]
-        public void ToImmutableSortedSetTest()
+        public void ToImmutableSortedSetFromArrayTest()
         {
             var set = new[] { 1, 2, 2 }.ToImmutableSortedSet();
             Assert.Same(Comparer<int>.Default, set.KeyComparer);
             Assert.Equal(2, set.Count);
+        }
+
+        [Theory]
+        [InlineData(new int[] { }, new int[] { })]
+        [InlineData(new int[] { 1 }, new int[] { 1 })]
+        [InlineData(new int[] { 1, 1 }, new int[] { 1 })]
+        [InlineData(new int[] { 1, 1, 1 }, new int[] { 1 })]
+        [InlineData(new int[] { 1, 2, 3 }, new int[] { 1, 2, 3 })]
+        [InlineData(new int[] { 3, 2, 1 }, new int[] { 1, 2, 3 })]
+        [InlineData(new int[] { 1, 1, 3 }, new int[] { 1, 3 })]
+        [InlineData(new int[] { 1, 2, 2 }, new int[] { 1, 2 })]
+        [InlineData(new int[] { 1, 2, 2, 3, 3, 3 }, new int[] { 1, 2, 3 })]
+        [InlineData(new int[] { 1, 2, 3, 1, 2, 3 }, new int[] { 1, 2, 3 })]
+        [InlineData(new int[] { 1, 1, 2, 2, 2, 3, 3, 3, 3 }, new int[] { 1, 2, 3 })]
+        public void ToImmutableSortedSetFromEnumerableTest(int[] input, int[] expectedOutput)
+        {
+            IEnumerable<int> enumerableInput = input.Select(i => i); // prevent querying for indexable interfaces
+            var set = enumerableInput.ToImmutableSortedSet();
+            Assert.Equal((IEnumerable<int>)expectedOutput, set.ToArray());
+        }
+
+        [Theory]
+        [InlineData(new int[] { }, new int[] { 1 })]
+        [InlineData(new int[] { 1 }, new int[] { 1 })]
+        [InlineData(new int[] { 1, 1 }, new int[] { 1 })]
+        [InlineData(new int[] { 1, 1, 1 }, new int[] { 1 })]
+        [InlineData(new int[] { 1, 2, 3 }, new int[] { 1, 2, 3 })]
+        [InlineData(new int[] { 3, 2, 1 }, new int[] { 1, 2, 3 })]
+        [InlineData(new int[] { 1, 1, 3 }, new int[] { 1, 3 })]
+        [InlineData(new int[] { 1, 2, 2 }, new int[] { 1, 2 })]
+        [InlineData(new int[] { 1, 2, 2, 3, 3, 3 }, new int[] { 1, 2, 3 })]
+        [InlineData(new int[] { 1, 2, 3, 1, 2, 3 }, new int[] { 1, 2, 3 })]
+        [InlineData(new int[] { 1, 1, 2, 2, 2, 3, 3, 3, 3 }, new int[] { 1, 2, 3 })]
+        public void UnionWithEnumerableTest(int[] input, int[] expectedOutput)
+        {
+            IEnumerable<int> enumerableInput = input.Select(i => i); // prevent querying for indexable interfaces
+            var set = ImmutableSortedSet.Create(1).Union(enumerableInput);
+            Assert.Equal((IEnumerable<int>)expectedOutput, set.ToArray());
         }
 
         [Fact]
@@ -319,6 +358,29 @@ namespace System.Collections.Immutable.Test
             enumerator.Dispose();
         }
 
+        [Fact]
+        public void DebuggerAttributesValid()
+        {
+            DebuggerAttributes.ValidateDebuggerDisplayReferences(ImmutableSortedSet.Create<int>());
+            DebuggerAttributes.ValidateDebuggerTypeProxyProperties(ImmutableSortedSet.Create<string>("1", "2", "3"));
+
+            object rootNode = DebuggerAttributes.GetFieldValue(ImmutableSortedSet.Create<object>(), "_root");
+            DebuggerAttributes.ValidateDebuggerDisplayReferences(rootNode);
+        }
+
+        [Fact]
+        public void SymmetricExceptWithComparerTests()
+        {
+            var set = ImmutableSortedSet.Create<string>("a").WithComparer(StringComparer.OrdinalIgnoreCase);
+            var otherCollection = new[] {"A"};
+
+            var expectedSet = new SortedSet<string>(set, set.KeyComparer);
+            expectedSet.SymmetricExceptWith(otherCollection);
+
+            var actualSet = set.SymmetricExcept(otherCollection);
+            CollectionAssertAreEquivalent(expectedSet.ToList(), actualSet.ToList());
+        }
+
         protected override IImmutableSet<T> Empty<T>()
         {
             return ImmutableSortedSet<T>.Empty;
@@ -332,6 +394,11 @@ namespace System.Collections.Immutable.Test
         protected override ISet<T> EmptyMutable<T>()
         {
             return new SortedSet<T>();
+        }
+
+        internal override IBinaryTree GetRootNode<T>(IImmutableSet<T> set)
+        {
+            return ((ImmutableSortedSet<T>)set).Root;
         }
 
         /// <summary>

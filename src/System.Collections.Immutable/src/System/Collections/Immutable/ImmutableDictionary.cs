@@ -1,19 +1,16 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Validation;
 
 namespace System.Collections.Immutable
 {
     /// <summary>
-    /// A set of initialization methods for instances of <see cref="ImmutableDictionary{TKey, TValue}" />.
+    /// A set of initialization methods for instances of <see cref="ImmutableDictionary{TKey, TValue}"/>.
     /// </summary>
     [SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
     public static class ImmutableDictionary
@@ -309,7 +306,7 @@ namespace System.Collections.Immutable
         /// </summary>
         /// <param name="dictionary">The dictionary to retrieve the value from.</param>
         /// <param name="key">The key to search for.</param>
-        /// <returns>The value for the key, or <c>default(TValue)</c> if no matching key was found.</returns>
+        /// <returns>The value for the key, or the default value of type <typeparamref name="TValue"/> if no matching key was found.</returns>
         [Pure]
         public static TValue GetValueOrDefault<TKey, TValue>(this IImmutableDictionary<TKey, TValue> dictionary, TKey key)
         {

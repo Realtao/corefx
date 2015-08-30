@@ -9,6 +9,7 @@ namespace XmlDocumentTests.XmlAttributeTests
     public static class SpecifiedTests
     {
         [Fact]
+        [OuterLoop]
         public static void AttributeSpecifiedTest()
         {
             var xmlDocument = new XmlDocument();

@@ -21,6 +21,7 @@ namespace XmlDocumentTests.XmlDocumentTests
         }
 
         [Fact]
+        [OuterLoop]
         public static void LongElementName()
         {
             var xmlDocument = new XmlDocument();
@@ -59,14 +60,14 @@ namespace XmlDocumentTests.XmlDocumentTests
             Assert.Throws<NullReferenceException>(() => xmlDocument.CreateElement(null));
         }
 
-        /*[Fact] TODO*/
+        [Fact]
         public static void NamespaceWithNoLocalName()
         {
             var xmlDocument = new XmlDocument();
             Assert.Throws<XmlException>(() => xmlDocument.CreateElement("foo:"));
         }
 
-        /*[Fact] TODO*/
+        [Fact]
         public static void NamespaceAndLocalNameWithColon()
         {
             var xmlDocument = new XmlDocument();
@@ -84,7 +85,7 @@ namespace XmlDocumentTests.XmlDocumentTests
             Assert.Equal("foo:bar", newNode.Name);
         }
 
-        /*[Fact] TODO*/
+        [Fact]
         public static void NameWithWhitespace()
         {
             var xmlDocument = new XmlDocument();

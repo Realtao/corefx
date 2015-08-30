@@ -7,23 +7,23 @@ namespace System.Reflection.Metadata
 {
     public struct InterfaceImplementation
     {
-        private readonly MetadataReader reader;
+        private readonly MetadataReader _reader;
 
         // Workaround: JIT doesn't generate good code for nested structures, so use RowId.
-        private readonly uint rowId;
+        private readonly int _rowId;
 
         internal InterfaceImplementation(MetadataReader reader, InterfaceImplementationHandle handle)
         {
             Debug.Assert(reader != null);
             Debug.Assert(!handle.IsNil);
 
-            this.reader = reader;
-            this.rowId = handle.RowId;
+            _reader = reader;
+            _rowId = handle.RowId;
         }
 
         private InterfaceImplementationHandle Handle
         {
-            get { return InterfaceImplementationHandle.FromRowId(rowId); }
+            get { return InterfaceImplementationHandle.FromRowId(_rowId); }
         }
 
 
@@ -31,14 +31,14 @@ namespace System.Reflection.Metadata
         /// The interface that is implemented
         /// <see cref="TypeDefinitionHandle"/>, <see cref="TypeReferenceHandle"/>, or <see cref="TypeSpecificationHandle"/>
         /// </summary>
-        public Handle Interface
+        public EntityHandle Interface
         {
-            get { return reader.InterfaceImplTable.GetInterface(rowId); }
+            get { return _reader.InterfaceImplTable.GetInterface(_rowId); }
         }
 
         public CustomAttributeHandleCollection GetCustomAttributes()
         {
-            return new CustomAttributeHandleCollection(reader, Handle);
+            return new CustomAttributeHandleCollection(_reader, Handle);
         }
     }
 }

@@ -1,11 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace System.Collections.Immutable.Test
 {
@@ -15,7 +11,7 @@ namespace System.Collections.Immutable.Test
     /// <typeparam name="T"></typeparam>
     internal class EverythingEqual<T> : IEqualityComparer<T>, IEqualityComparer
     {
-        private static EverythingEqual<T> singleton = new EverythingEqual<T>();
+        private static EverythingEqual<T> s_singleton = new EverythingEqual<T>();
 
         private EverythingEqual() { }
 
@@ -23,7 +19,7 @@ namespace System.Collections.Immutable.Test
         {
             get
             {
-                return singleton;
+                return s_singleton;
             }
         }
 

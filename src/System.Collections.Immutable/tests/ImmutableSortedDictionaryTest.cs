@@ -1,12 +1,10 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using Xunit;
 
 namespace System.Collections.Immutable.Test
@@ -29,7 +27,7 @@ namespace System.Collections.Immutable.Test
             var actual = ImmutableSortedDictionary<int, bool>.Empty;
 
             int seed = (int)DateTime.Now.Ticks;
-            Console.WriteLine("Using random seed {0}", seed);
+            Debug.WriteLine("Using random seed {0}", seed);
             var random = new Random(seed);
 
             for (int iOp = 0; iOp < operationCount; iOp++)
@@ -44,7 +42,7 @@ namespace System.Collections.Immutable.Test
                         }
                         while (expected.ContainsKey(key));
                         bool value = random.Next() % 2 == 0;
-                        Console.WriteLine("Adding \"{0}\"={1} to the set.", key, value);
+                        Debug.WriteLine("Adding \"{0}\"={1} to the set.", key, value);
                         expected.Add(key, value);
                         actual = actual.Add(key, value);
                         break;
@@ -66,7 +64,7 @@ namespace System.Collections.Immutable.Test
                         }
 
                         value = random.Next() % 2 == 0;
-                        Console.WriteLine("Setting \"{0}\"={1} to the set (overwrite={2}).", key, value, overwrite);
+                        Debug.WriteLine("Setting \"{0}\"={1} to the set (overwrite={2}).", key, value, overwrite);
                         expected[key] = value;
                         actual = actual.SetItem(key, value);
                         break;
@@ -76,7 +74,7 @@ namespace System.Collections.Immutable.Test
                         {
                             int position = random.Next(expected.Count);
                             key = expected.Skip(position).First().Key;
-                            Console.WriteLine("Removing element \"{0}\" from the set.", key);
+                            Debug.WriteLine("Removing element \"{0}\" from the set.", key);
                             Assert.True(expected.Remove(key));
                             actual = actual.Remove(key);
                         }
@@ -307,6 +305,15 @@ namespace System.Collections.Immutable.Test
         }
 
         [Fact]
+        public void CollisionExceptionMessageContainsKey()
+        {
+            var map = ImmutableSortedDictionary.Create<string, string>()
+                .Add("firstKey", "1").Add("secondKey", "2");
+            var exception = Assert.Throws<ArgumentException>(() => map.Add("firstKey", "3"));
+            Assert.Contains("firstKey", exception.Message);
+        }
+
+        [Fact]
         public void WithComparersEmptyCollection()
         {
             var map = ImmutableSortedDictionary.Create<string, string>();
@@ -342,6 +349,16 @@ namespace System.Collections.Immutable.Test
             Assert.Throws<InvalidOperationException>(() => enumerator.Current);
             enumerator.Dispose();
         }
+        
+        [Fact]
+        public void DebuggerAttributesValid()
+        {
+            DebuggerAttributes.ValidateDebuggerDisplayReferences(ImmutableSortedDictionary.Create<string, int>());
+            DebuggerAttributes.ValidateDebuggerTypeProxyProperties(ImmutableSortedDictionary.Create<int, int>());
+
+            object rootNode = DebuggerAttributes.GetFieldValue(ImmutableSortedDictionary.Create<string, string>(), "_root");
+            DebuggerAttributes.ValidateDebuggerDisplayReferences(rootNode);
+        }
 
         ////[Fact] // not really a functional test -- but very useful to enable when collecting perf traces.
         public void EnumerationPerformance()
@@ -364,7 +381,8 @@ namespace System.Collections.Immutable.Test
                 sw.Reset();
             }
 
-            File.AppendAllText(Environment.ExpandEnvironmentVariables(@"%TEMP%\timing.txt"), string.Join(Environment.NewLine, timing));
+            string timingText = string.Join(Environment.NewLine, timing);
+            Debug.WriteLine("Timing:{0}{1}", Environment.NewLine, timingText);
         }
 
         ////[Fact] // not really a functional test -- but very useful to enable when collecting perf traces.
@@ -388,7 +406,8 @@ namespace System.Collections.Immutable.Test
                 sw.Reset();
             }
 
-            File.AppendAllText(Environment.ExpandEnvironmentVariables(@"%TEMP%\timing_empty.txt"), string.Join(Environment.NewLine, timing));
+            string timingText = string.Join(Environment.NewLine, timing);
+            Debug.WriteLine("Timing_Empty:{0}{1}", Environment.NewLine, timingText);
         }
 
         protected override IImmutableDictionary<TKey, TValue> Empty<TKey, TValue>()
@@ -404,6 +423,11 @@ namespace System.Collections.Immutable.Test
         protected override IEqualityComparer<TValue> GetValueComparer<TKey, TValue>(IImmutableDictionary<TKey, TValue> dictionary)
         {
             return ((ImmutableSortedDictionary<TKey, TValue>)dictionary).ValueComparer;
+        }
+
+        internal override IBinaryTree GetRootNode<TKey, TValue>(IImmutableDictionary<TKey, TValue> dictionary)
+        {
+            return ((ImmutableSortedDictionary<TKey, TValue>)dictionary).Root;
         }
 
         protected void ContainsValueTestHelper<TKey, TValue>(ImmutableSortedDictionary<TKey, TValue> map, TKey key, TValue value)

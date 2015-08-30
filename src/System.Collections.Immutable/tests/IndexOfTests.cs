@@ -1,11 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace System.Collections.Immutable.Test
@@ -98,6 +95,7 @@ namespace System.Collections.Immutable.Test
             Assert.Throws<ArgumentOutOfRangeException>(() => lastIndexOfItemIndexCountEQ(emptyCollection, 100, -1, 1, new CustomComparer(50)));
             Assert.Throws<ArgumentOutOfRangeException>(() => lastIndexOfItemIndexCountEQ(collection1256, 100, 1, 20, new CustomComparer(1)));
             Assert.Throws<ArgumentOutOfRangeException>(() => lastIndexOfItemIndexCountEQ(collection1256, 100, 1, -1, new CustomComparer(1)));
+            Assert.Throws<ArgumentOutOfRangeException>(() => lastIndexOfItemIndex(collection1256, 2, 5));
 
             Assert.Equal(-1, lastIndexOfItem(emptyCollection, 5));
             Assert.Equal(-1, lastIndexOfItemEQ(emptyCollection, 5, EqualityComparer<int>.Default));
@@ -146,17 +144,17 @@ namespace System.Collections.Immutable.Test
 
         private class CustomComparer : IEqualityComparer<int>
         {
-            private readonly int matchOnXIteration;
-            private int iteration;
+            private readonly int _matchOnXIteration;
+            private int _iteration;
 
             public CustomComparer(int matchOnXIteration)
             {
-                this.matchOnXIteration = matchOnXIteration;
+                _matchOnXIteration = matchOnXIteration;
             }
 
             public bool Equals(int x, int y)
             {
-                return ++iteration == this.matchOnXIteration;
+                return ++_iteration == _matchOnXIteration;
             }
 
             public int GetHashCode(int obj)

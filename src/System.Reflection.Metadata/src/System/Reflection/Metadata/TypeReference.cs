@@ -8,28 +8,28 @@ namespace System.Reflection.Metadata
 {
     public struct TypeReference
     {
-        private readonly MetadataReader reader;
+        private readonly MetadataReader _reader;
 
         // Workaround: JIT doesn't generate good code for nested structures, so use RowId.
-        private readonly uint treatmentAndRowId;
+        private readonly uint _treatmentAndRowId;
 
         internal TypeReference(MetadataReader reader, uint treatmentAndRowId)
         {
             Debug.Assert(reader != null);
             Debug.Assert(treatmentAndRowId != 0);
 
-            this.reader = reader;
-            this.treatmentAndRowId = treatmentAndRowId;
+            _reader = reader;
+            _treatmentAndRowId = treatmentAndRowId;
         }
 
-        private uint RowId
+        private int RowId
         {
-            get { return treatmentAndRowId & TokenTypeIds.RIDMask; }
+            get { return (int)(_treatmentAndRowId & TokenTypeIds.RIDMask); }
         }
 
         private TypeRefTreatment Treatment
         {
-            get { return (TypeRefTreatment)(treatmentAndRowId >> TokenTypeIds.RowIdBitCount); }
+            get { return (TypeRefTreatment)(_treatmentAndRowId >> TokenTypeIds.RowIdBitCount); }
         }
 
         private TypeReferenceHandle Handle
@@ -45,18 +45,18 @@ namespace System.Reflection.Metadata
         /// <list type="bullet">
         /// <item><description><see cref="TypeReferenceHandle"/> of the enclosing type, if the target type is a nested type.</description></item>
         /// <item><description><see cref="ModuleReferenceHandle"/>, if the target type is defined in another module within the same assembly as this one.</description></item>
-        /// <item><description><see cref="Metadata.Handle.ModuleDefinition"/>, if the target type is defined in the current module. This should not occur in a CLI compressed metadata module.</description></item>
+        /// <item><description><see cref="EntityHandle.ModuleDefinition"/>, if the target type is defined in the current module. This should not occur in a CLI compressed metadata module.</description></item>
         /// <item><description><see cref="AssemblyReferenceHandle"/>, if the target type is defined in a different assembly from the current module.</description></item>
         /// <item><description>Nil handle if the target type must be resolved by searching the <see cref="MetadataReader.ExportedTypes"/> for a matching <see cref="Namespace"/> and <see cref="Name"/>.</description></item>
         /// </list>
         /// </remarks>
-        public Handle ResolutionScope
+        public EntityHandle ResolutionScope
         {
             get
             {
                 if (Treatment == 0)
                 {
-                    return reader.TypeRefTable.GetResolutionScope(Handle);
+                    return _reader.TypeRefTable.GetResolutionScope(Handle);
                 }
 
                 return GetProjectedResolutionScope();
@@ -72,7 +72,7 @@ namespace System.Reflection.Metadata
             {
                 if (Treatment == 0)
                 {
-                    return reader.TypeRefTable.GetName(Handle);
+                    return _reader.TypeRefTable.GetName(Handle);
                 }
 
                 return GetProjectedName();
@@ -80,7 +80,7 @@ namespace System.Reflection.Metadata
         }
 
         /// <summary>
-        /// Name of the namespace where the target type is defined, or nil if the type is nested or defined in a root namespace.
+        /// Full name of the namespace where the target type is defined, or nil if the type is nested or defined in a root namespace.
         /// </summary>
         public StringHandle Namespace
         {
@@ -88,7 +88,7 @@ namespace System.Reflection.Metadata
             {
                 if (Treatment == 0)
                 {
-                    return reader.TypeRefTable.GetNamespace(Handle);
+                    return _reader.TypeRefTable.GetNamespace(Handle);
                 }
 
                 return GetProjectedNamespace();
@@ -97,7 +97,7 @@ namespace System.Reflection.Metadata
 
         #region Projections
 
-        private Handle GetProjectedResolutionScope()
+        private EntityHandle GetProjectedResolutionScope()
         {
             switch (Treatment)
             {
@@ -121,7 +121,7 @@ namespace System.Reflection.Metadata
             }
             else
             {
-                return reader.TypeRefTable.GetName(Handle);
+                return _reader.TypeRefTable.GetName(Handle);
             }
         }
 

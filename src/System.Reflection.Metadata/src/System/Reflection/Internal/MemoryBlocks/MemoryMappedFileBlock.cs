@@ -1,25 +1,24 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace System.Reflection.Internal
 {
     internal unsafe sealed class MemoryMappedFileBlock : AbstractMemoryBlock
     {
-        private readonly int size;
-        private IDisposable accessor; // MemoryMappedViewAccessor
-        private byte* pointer;
-        private SafeBuffer safeBuffer;
+        private readonly int _size;
+        private IDisposable _accessor; // MemoryMappedViewAccessor
+        private byte* _pointer;
+        private SafeBuffer _safeBuffer;
 
-        internal unsafe MemoryMappedFileBlock(IDisposable accessor, int size)
+        internal unsafe MemoryMappedFileBlock(IDisposable accessor, SafeBuffer safeBuffer, byte* pointer, int size)
         {
-            this.accessor = accessor;
-            this.pointer = MemoryMapLightUp.AcquirePointer(accessor, out safeBuffer);
-            this.size = size;
+            _accessor = accessor;
+            _safeBuffer = safeBuffer;
+            _pointer = pointer;
+            _size = size;
         }
 
         ~MemoryMappedFileBlock()
@@ -29,29 +28,29 @@ namespace System.Reflection.Internal
 
         protected override void Dispose(bool disposing)
         {
-            if (safeBuffer != null)
+            if (_safeBuffer != null)
             {
-                safeBuffer.ReleasePointer();
-                safeBuffer = null;
+                _safeBuffer.ReleasePointer();
+                _safeBuffer = null;
             }
 
-            if (accessor != null)
+            if (_accessor != null)
             {
-                accessor.Dispose();
-                accessor = null;
+                _accessor.Dispose();
+                _accessor = null;
             }
 
-            pointer = null;
+            _pointer = null;
         }
 
         public override byte* Pointer
         {
-            get { return this.pointer; }
+            get { return _pointer; }
         }
 
         public override int Size
         {
-            get { return size; }
+            get { return _size; }
         }
 
         public override ImmutableArray<byte> GetContent(int offset)

@@ -11,12 +11,12 @@ namespace System.Reflection.Metadata
 {
     public sealed class MethodBodyBlock
     {
-        private readonly MemoryBlock il;
-        private readonly int size;
-        private readonly ushort maxStack;
-        private readonly bool localVariablesInitialized;
-        private readonly StandaloneSignatureHandle localSignature;
-        private readonly ImmutableArray<ExceptionRegion> exceptionRegions;
+        private readonly MemoryBlock _il;
+        private readonly int _size;
+        private readonly ushort _maxStack;
+        private readonly bool _localVariablesInitialized;
+        private readonly StandaloneSignatureHandle _localSignature;
+        private readonly ImmutableArray<ExceptionRegion> _exceptionRegions;
 
         private MethodBodyBlock(
             bool localVariablesInitialized,
@@ -28,12 +28,12 @@ namespace System.Reflection.Metadata
         {
             Debug.Assert(!exceptionRegions.IsDefault);
 
-            this.localVariablesInitialized = localVariablesInitialized;
-            this.maxStack = maxStack;
-            this.localSignature = localSignatureHandle;
-            this.il = il;
-            this.exceptionRegions = exceptionRegions;
-            this.size = size;
+            _localVariablesInitialized = localVariablesInitialized;
+            _maxStack = maxStack;
+            _localSignature = localSignatureHandle;
+            _il = il;
+            _exceptionRegions = exceptionRegions;
+            _size = size;
         }
 
         /// <summary>
@@ -41,43 +41,43 @@ namespace System.Reflection.Metadata
         /// </summary>
         public int Size
         {
-            get { return size; }
+            get { return _size; }
         }
 
         public int MaxStack
         {
-            get { return maxStack; }
+            get { return _maxStack; }
         }
 
         public bool LocalVariablesInitialized
         {
-            get { return localVariablesInitialized; }
+            get { return _localVariablesInitialized; }
         }
 
         public StandaloneSignatureHandle LocalSignature
         {
-            get { return localSignature; }
+            get { return _localSignature; }
         }
 
         public ImmutableArray<ExceptionRegion> ExceptionRegions
         {
-            get { return exceptionRegions; }
+            get { return _exceptionRegions; }
         }
 
         public byte[] GetILBytes()
         {
-            return il.ToArray();
+            return _il.ToArray();
         }
 
         public ImmutableArray<byte> GetILContent()
         {
             byte[] bytes = GetILBytes();
-            return ImmutableArrayInterop.DangerousCreateFromUnderlyingArray(ref bytes);
+            return ImmutableByteArrayInterop.DangerousCreateFromUnderlyingArray(ref bytes);
         }
 
         public BlobReader GetILReader()
         {
-            return new BlobReader(il);
+            return new BlobReader(_il);
         }
 
         private const byte ILTinyFormat = 0x02;
@@ -98,7 +98,7 @@ namespace System.Reflection.Metadata
             int startOffset = reader.Offset;
             int ilSize;
 
-            // Error need to check if the Memory Block is empty. This is calse for all the calls...
+            // Error need to check if the Memory Block is empty. This is false for all the calls...
             byte headByte = reader.ReadByte();
             if ((headByte & ILFormatMask) == ILTinyFormat)
             {
@@ -120,14 +120,14 @@ namespace System.Reflection.Metadata
 
             if ((headByte & ILFormatMask) != ILFatFormat)
             {
-                throw new BadImageFormatException(string.Format(MetadataResources.InvalidMethodHeader1, headByte));
+                throw new BadImageFormatException(string.Format(SR.InvalidMethodHeader1, headByte));
             }
 
             // FatILFormat
             byte headByte2 = reader.ReadByte();
             if ((headByte2 >> ILFatFormatHeaderSizeShift) != ILFatFormatHeaderSize)
             {
-                throw new BadImageFormatException(string.Format(MetadataResources.InvalidMethodHeader2, headByte, headByte2));
+                throw new BadImageFormatException(string.Format(SR.InvalidMethodHeader2, headByte, headByte2));
             }
 
             bool localsInitialized = (headByte & ILInitLocals) == ILInitLocals;
@@ -142,13 +142,13 @@ namespace System.Reflection.Metadata
             {
                 localSignatureHandle = default(StandaloneSignatureHandle);
             }
-            else if ((localSignatureToken & TokenTypeIds.TokenTypeMask) == TokenTypeIds.Signature)
+            else if ((localSignatureToken & TokenTypeIds.TypeMask) == TokenTypeIds.Signature)
             {
-                localSignatureHandle = StandaloneSignatureHandle.FromRowId((uint)localSignatureToken & TokenTypeIds.RIDMask);
+                localSignatureHandle = StandaloneSignatureHandle.FromRowId((int)((uint)localSignatureToken & TokenTypeIds.RIDMask));
             }
             else
             {
-                throw new BadImageFormatException(string.Format(MetadataResources.InvalidLocalSignatureToken, unchecked((uint)localSignatureToken)));
+                throw new BadImageFormatException(string.Format(SR.InvalidLocalSignatureToken, unchecked((uint)localSignatureToken)));
             }
 
             var ilBlock = reader.GetMemoryBlockAt(0, ilSize);
@@ -161,7 +161,7 @@ namespace System.Reflection.Metadata
                 byte sehHeader = reader.ReadByte();
                 if ((sehHeader & SectEHTable) != SectEHTable)
                 {
-                    throw new BadImageFormatException(string.Format(MetadataResources.InvalidSehHeader, sehHeader));
+                    throw new BadImageFormatException(string.Format(SR.InvalidSehHeader, sehHeader));
                 }
 
                 bool sehFatFormat = (sehHeader & SectFatFormat) == SectFatFormat;

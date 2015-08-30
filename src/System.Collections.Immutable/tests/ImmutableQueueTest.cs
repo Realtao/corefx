@@ -1,11 +1,10 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Linq;
-using System.Text;
 using Xunit;
 
 namespace System.Collections.Immutable.Test
@@ -230,6 +229,13 @@ namespace System.Collections.Immutable.Test
         {
             // We already test Create(), so just prove that Empty has the same effect.
             Assert.Same(ImmutableQueue.Create<int>(), ImmutableQueue<int>.Empty);
+        }
+
+        [Fact]
+        public void DebuggerAttributesValid()
+        {
+            DebuggerAttributes.ValidateDebuggerDisplayReferences(ImmutableQueue.Create<int>());
+            DebuggerAttributes.ValidateDebuggerTypeProxyProperties(ImmutableQueue.Create<string>());
         }
 
         protected override IEnumerable<T> GetEnumerableOf<T>(params T[] contents)

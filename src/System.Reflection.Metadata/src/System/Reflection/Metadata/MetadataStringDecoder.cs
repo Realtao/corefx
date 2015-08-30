@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Text;
-using System.Reflection.Internal;
 using System.Diagnostics;
+using System.Reflection.Internal;
+using System.Text;
 
 namespace System.Reflection.Metadata
 {
@@ -23,8 +23,8 @@ namespace System.Reflection.Metadata
     /// </remarks>
     public class MetadataStringDecoder
     {
-        private static readonly MetadataStringDecoder defaultUTF8 = new MetadataStringDecoder(Encoding.UTF8);
-        private readonly Encoding encoding;
+        private static readonly MetadataStringDecoder s_defaultUTF8 = new MetadataStringDecoder(Encoding.UTF8);
+        private readonly Encoding _encoding;
 
         /// <summary>
         /// The default decoder used by <see cref="MetadataReader"/> to decode UTF-8 when
@@ -32,7 +32,7 @@ namespace System.Reflection.Metadata
         /// </summary>
         public static MetadataStringDecoder DefaultUTF8
         {
-            get { return defaultUTF8; }
+            get { return s_defaultUTF8; }
         }
 
         /// <summary>
@@ -52,14 +52,14 @@ namespace System.Reflection.Metadata
             // Non-enforcement of (encoding is UTF8Encoding) here is by design.
             //
             // This type is not itself aware of any particular encoding. However, the constructor argument that accepts a 
-            // MetadataStringDecoderargument is validated however because it must be a UTF8 decoder.
+            // MetadataStringDecoder argument is validated however because it must be a UTF8 decoder.
             //
             // Above architectural purity, the fact that you can get our default implementation of Encoding.GetString
-            // is a hidden feature to use our light-up of unsafe Encoding.GetSring outside this assembly on an arbitrary 
+            // is a hidden feature to use our light-up of unsafe Encoding.GetString outside this assembly on an arbitrary 
             // encoding. I'm more comfortable sharing that hack than having the reflection over internal 
             // CreateStringFromEncoding spread.
 
-            this.encoding = encoding;
+            _encoding = encoding;
         }
 
         /// <summary>
@@ -67,7 +67,7 @@ namespace System.Reflection.Metadata
         /// </summary>
         public Encoding Encoding
         {
-            get { return this.encoding; }
+            get { return _encoding; }
         }
 
         /// <summary>
@@ -81,11 +81,11 @@ namespace System.Reflection.Metadata
         /// <returns>The decoded string.</returns>
         public unsafe virtual String GetString(byte* bytes, int byteCount)
         {
-            Debug.Assert(this.encoding != null);
+            Debug.Assert(_encoding != null);
 
             // Note that this call is currently wired to the light-up extension in EncodingHelper
             // for portability.
-            return this.encoding.GetString(bytes, byteCount);
+            return _encoding.GetString(bytes, byteCount);
         }
     }
 }

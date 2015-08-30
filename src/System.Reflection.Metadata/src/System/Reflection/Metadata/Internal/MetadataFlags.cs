@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Diagnostics;
+
 namespace System.Reflection.Metadata.Ecma335
 {
     internal enum MetadataStreamKind
@@ -120,86 +122,171 @@ namespace System.Reflection.Metadata.Ecma335
 
     internal enum StringKind : byte
     {
-        Plain = 0,
-        WinRTPrefixed = 1,
-        DotTerminated = 2,
+        Plain = (byte)(StringHandleType.String >> HeapHandleType.OffsetBitCount),
+        Virtual = (byte)(StringHandleType.VirtualString >> HeapHandleType.OffsetBitCount),
+        WinRTPrefixed = (byte)(StringHandleType.WinRTPrefixedString >> HeapHandleType.OffsetBitCount),
+        DotTerminated = (byte)(StringHandleType.DotTerminatedString >> HeapHandleType.OffsetBitCount),
     }
 
-    internal enum NamespaceKind : byte
+    internal static class StringHandleType
     {
-        Plain = 0,
-        Synthetic = 1,
+        // NUL-terminated UTF8 string on a #String heap.
+        internal const uint String = 0;
+
+        // String on #String heap whose terminator is NUL and '.', whichever comes first.
+        internal const uint DotTerminatedString = String | (1 << HeapHandleType.OffsetBitCount);
+
+        // Reserved values that can be used for future strings:
+        internal const uint ReservedString1 = String | (2 << HeapHandleType.OffsetBitCount);
+        internal const uint ReservedString2 = String | (3 << HeapHandleType.OffsetBitCount);
+
+        // Virtual string identified by a virtual index
+        internal const uint VirtualString = HeapHandleType.VirtualBit | String;
+
+        // Virtual string whose value is a "<WinRT>" prefixed string found at the specified heap offset.          
+        internal const uint WinRTPrefixedString = HeapHandleType.VirtualBit | String | (1 << HeapHandleType.OffsetBitCount);
+
+        // Reserved virtual strings that can be used in future:
+        internal const uint ReservedVirtualString1 = HeapHandleType.VirtualBit | String | (2 << HeapHandleType.OffsetBitCount);
+        internal const uint ReservedVirtualString2 = HeapHandleType.VirtualBit | String | (3 << HeapHandleType.OffsetBitCount);
     }
 
-    internal static class TokenTypeIds
+    internal static class HeapHandleType
     {
-        internal const uint Module = 0x00000000;
-        internal const uint TypeRef = 0x01000000;
-        internal const uint TypeDef = 0x02000000;
-        internal const uint FieldDef = 0x04000000;
-        internal const uint MethodDef = 0x06000000;
-        internal const uint ParamDef = 0x08000000;
-        internal const uint InterfaceImpl = 0x09000000;
-        internal const uint MemberRef = 0x0a000000;
-        internal const uint Constant = 0x0b000000;
-        internal const uint CustomAttribute = 0x0c000000;
-        internal const uint DeclSecurity = 0x0e000000;
-        internal const uint Signature = 0x11000000;
-        internal const uint EventMap = 0x12000000;
-        internal const uint Event = 0x14000000;
-        internal const uint PropertyMap = 0x15000000;
-        internal const uint Property = 0x17000000;
-        internal const uint MethodSemantics = 0x18000000;
-        internal const uint MethodImpl = 0x19000000;
-        internal const uint ModuleRef = 0x1a000000;
-        internal const uint TypeSpec = 0x1b000000;
-        internal const uint Assembly = 0x20000000;
-        internal const uint AssemblyRef = 0x23000000;
-        internal const uint File = 0x26000000;
-        internal const uint ExportedType = 0x27000000;
-        internal const uint ManifestResource = 0x28000000;
-        internal const uint NestedClass = 0x29000000;
-        internal const uint GenericParam = 0x2a000000;
-        internal const uint MethodSpec = 0x2b000000;
-        internal const uint GenericParamConstraint = 0x2c000000;
+        // Heap offset values are limited to 29 bits (max compressed integer)
+        internal const int OffsetBitCount = 29;
+        internal const uint OffsetMask = (1 << OffsetBitCount) - 1;
+        internal const uint VirtualBit = 0x80000000;
+        internal const uint NonVirtualTypeMask = 3u << OffsetBitCount;
+        internal const uint TypeMask = VirtualBit | NonVirtualTypeMask;
 
-        internal const uint UserString = 0x70000000;     // #UserString heap
+        internal static bool IsValidHeapOffset(uint offset)
+        {
+            return (offset & ~OffsetMask) == 0;
+        }
+    }
+
+    internal static class HandleType
+    {
+        internal const uint Module = 0x00;
+        internal const uint TypeRef = 0x01;
+        internal const uint TypeDef = 0x02;
+        internal const uint FieldDef = 0x04;
+        internal const uint MethodDef = 0x06;
+        internal const uint ParamDef = 0x08;
+        internal const uint InterfaceImpl = 0x09;
+        internal const uint MemberRef = 0x0a;
+        internal const uint Constant = 0x0b;
+        internal const uint CustomAttribute = 0x0c;
+        internal const uint DeclSecurity = 0x0e;
+        internal const uint Signature = 0x11;
+        internal const uint EventMap = 0x12;
+        internal const uint Event = 0x14;
+        internal const uint PropertyMap = 0x15;
+        internal const uint Property = 0x17;
+        internal const uint MethodSemantics = 0x18;
+        internal const uint MethodImpl = 0x19;
+        internal const uint ModuleRef = 0x1a;
+        internal const uint TypeSpec = 0x1b;
+        internal const uint Assembly = 0x20;
+        internal const uint AssemblyRef = 0x23;
+        internal const uint File = 0x26;
+        internal const uint ExportedType = 0x27;
+        internal const uint ManifestResource = 0x28;
+        internal const uint NestedClass = 0x29;
+        internal const uint GenericParam = 0x2a;
+        internal const uint MethodSpec = 0x2b;
+        internal const uint GenericParamConstraint = 0x2c;
+
+        internal const uint UserString = 0x70;     // #UserString heap
 
         // The following values never appear in a token stored in metadata, 
         // they are just helper values to identify the type of a handle.
 
-        internal const uint Blob = 0x71000000;        // #Blob heap
-        internal const uint Guid = 0x72000000;        // #Guid heap
+        internal const uint Blob = 0x71;        // #Blob heap
+        internal const uint Guid = 0x72;        // #Guid heap
+        internal const uint Namespace = 0x73;   // #String heap but known to be the full name of a namespace
 
-        // #String heap and its modifications
-        internal const uint String = 0x78000000;               // #String heap
-        internal const uint WinRTPrefixedString = 0x79000000;  // #String heap with <WinRT> prefix
-        internal const uint DotTerminatedString = 0x7a000000;  // #String heap that treats '.' as a string terminator in addition to '\0'
-        // internal const uint ReservedString = 0x7b000000;    // [reserved] can only be used for a new string kind.
-        internal const uint MaxString = DotTerminatedString;
+        // #String heap and its modifications (up to 8 string kinds, virtual and non-virtual)
+        internal const uint String = 0x7c;
+        internal const uint DotTerminatedString = String | ((StringHandleType.DotTerminatedString & ~HeapHandleType.VirtualBit) >> HeapHandleType.OffsetBitCount);
+        internal const uint ReservedString1 = String | ((StringHandleType.ReservedString1 & ~HeapHandleType.VirtualBit) >> HeapHandleType.OffsetBitCount); 
+        internal const uint ReservedString2 = String | ((StringHandleType.ReservedString2 & ~HeapHandleType.VirtualBit) >> HeapHandleType.OffsetBitCount); 
+        internal const uint VirtualString = VirtualBit | String;
+        internal const uint WinRTPrefixedString = VirtualBit | String | ((StringHandleType.WinRTPrefixedString & ~HeapHandleType.VirtualBit) >> HeapHandleType.OffsetBitCount);
+        internal const uint ReservedVirtualString1 = VirtualBit | String | ((StringHandleType.ReservedString1 & ~HeapHandleType.VirtualBit) >> HeapHandleType.OffsetBitCount);
+        internal const uint ReservedVirtualString2 = VirtualBit | String | ((StringHandleType.ReservedString2 & ~HeapHandleType.VirtualBit) >> HeapHandleType.OffsetBitCount);
 
-        internal const uint Namespace = 0x7c000000;              // Namespace handle for namespace with types of its own
-        internal const uint SyntheticNamespace = 0x7d000000;     // Namespace handle for namespace with child namespaces but no types of its own
-        // internal const uint Reserved1Namespace = 0x7e000000;  // [reserved] can only be used for a new namespace kind
-        // internal const uint Resereved2Namespace = 0x7f000000; // [reserved] can only be used for a new namespace kind
-        internal const uint MaxNamespace = SyntheticNamespace;
+        internal const uint StringHeapTypeMask = HeapHandleType.NonVirtualTypeMask >> HeapHandleType.OffsetBitCount;
+        internal const uint StringOrNamespaceMask = 0x7c;
 
-        internal const uint StringOrNamespaceKindMask = 0x03000000;
-
-        internal const uint HeapMask = 0x70000000;
-        internal const uint RIDMask = 0x00FFFFFF;
-        internal const uint TableTokenTypeMask = 0x5F000000;
-        internal const uint TokenTypeMask = 0x7F000000;
+        internal const uint HeapMask = 0x70;
+        internal const uint TypeMask = 0x7F;
 
         /// <summary>
         /// Use the highest bit to mark tokens that are virtual (synthesized).
         /// We create virtual tokens to represent projected WinMD entities. 
         /// </summary>
-        internal const uint VirtualTokenMask = 1U << 31;
+        internal const uint VirtualBit = 0x80;
 
-        internal const uint VirtualBitAndRowIdMask = VirtualTokenMask | RIDMask;
+        public static HandleKind ToHandleKind(uint handleType)
+        {
+            Debug.Assert((handleType & VirtualBit) == 0);
+
+            // Do not surface special string token sub-types (e.g. dot terminated, winrt prefixed) 
+            // in public-facing handle type. Pretend that all strings are just plain strings.
+            if (handleType > String)
+            {
+                return HandleKind.String;
+            }
+
+            return (HandleKind)handleType;
+        }
+    }
+
+    internal static class TokenTypeIds
+    {
+        internal const uint Module = HandleType.Module << RowIdBitCount;
+        internal const uint TypeRef = HandleType.TypeRef << RowIdBitCount;
+        internal const uint TypeDef = HandleType.TypeDef << RowIdBitCount;
+        internal const uint FieldDef = HandleType.FieldDef << RowIdBitCount;
+        internal const uint MethodDef = HandleType.MethodDef << RowIdBitCount;
+        internal const uint ParamDef = HandleType.ParamDef << RowIdBitCount;
+        internal const uint InterfaceImpl = HandleType.InterfaceImpl << RowIdBitCount;
+        internal const uint MemberRef = HandleType.MemberRef << RowIdBitCount;
+        internal const uint Constant = HandleType.Constant << RowIdBitCount;
+        internal const uint CustomAttribute = HandleType.CustomAttribute << RowIdBitCount;
+        internal const uint DeclSecurity = HandleType.DeclSecurity << RowIdBitCount;
+        internal const uint Signature = HandleType.Signature << RowIdBitCount;
+        internal const uint EventMap = HandleType.EventMap << RowIdBitCount;
+        internal const uint Event = HandleType.Event << RowIdBitCount;
+        internal const uint PropertyMap = HandleType.PropertyMap << RowIdBitCount;
+        internal const uint Property = HandleType.Property << RowIdBitCount;
+        internal const uint MethodSemantics = HandleType.MethodSemantics << RowIdBitCount;
+        internal const uint MethodImpl = HandleType.MethodImpl << RowIdBitCount;
+        internal const uint ModuleRef = HandleType.ModuleRef << RowIdBitCount;
+        internal const uint TypeSpec = HandleType.TypeSpec << RowIdBitCount;
+        internal const uint Assembly = HandleType.Assembly << RowIdBitCount;
+        internal const uint AssemblyRef = HandleType.AssemblyRef << RowIdBitCount;
+        internal const uint File = HandleType.File << RowIdBitCount;
+        internal const uint ExportedType = HandleType.ExportedType << RowIdBitCount;
+        internal const uint ManifestResource = HandleType.ManifestResource << RowIdBitCount;
+        internal const uint NestedClass = HandleType.NestedClass << RowIdBitCount;
+        internal const uint GenericParam = HandleType.GenericParam << RowIdBitCount;
+        internal const uint MethodSpec = HandleType.MethodSpec << RowIdBitCount;
+        internal const uint GenericParamConstraint = HandleType.GenericParamConstraint << RowIdBitCount;
+
+        internal const uint UserString = HandleType.UserString << RowIdBitCount;
 
         internal const int RowIdBitCount = 24;
+        internal const uint RIDMask = (1 << RowIdBitCount) - 1;
+        internal const uint TypeMask = HandleType.TypeMask << RowIdBitCount;
+
+        /// <summary>
+        /// Use the highest bit to mark tokens that are virtual (synthesized).
+        /// We create virtual tokens to represent projected WinMD entities. 
+        /// </summary>
+        internal const uint VirtualBit = 0x80000000;
 
         /// <summary>
         /// Returns true if the token value can escape the metadata reader.
@@ -215,9 +302,14 @@ namespace System.Reflection.Metadata.Ecma335
         /// list of tables) or to 0x70 for the User String heap.The least-significant 3 bytes specify the target row within that
         /// metadata table, or starting byte offset within the User String heap.
         /// </summary>
-        internal static bool IsEcmaToken(uint value)
+        internal static bool IsEntityOrUserStringToken(uint vToken)
         {
-            return (value & TokenTypeMask) <= UserString;
+            return (vToken & TypeMask) <= UserString;
+        }
+
+        internal static bool IsEntityToken(uint vToken)
+        {
+            return (vToken & TypeMask) < UserString;
         }
 
         internal static bool IsValidRowId(uint rowId)
@@ -225,11 +317,9 @@ namespace System.Reflection.Metadata.Ecma335
             return (rowId & ~RIDMask) == 0;
         }
 
-        internal static int CompareTokens(uint t1, uint t2)
+        internal static bool IsValidRowId(int rowId)
         {
-            // all virtual tokens will be sorted after non-virtual tokens
-            return (int)((t1 & RIDMask) | ((t1 & VirtualTokenMask) >> 3)) -
-                   (int)((t2 & RIDMask) | ((t2 & VirtualTokenMask) >> 3));
+            return (rowId & ~RIDMask) == 0;
         }
     }
 }

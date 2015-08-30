@@ -2,15 +2,14 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Xunit;
-using System;
 using System.Xml;
 
 namespace XmlDocumentTests.XmlNodeTests.InsertTests
 {
     public static class OneElementTests
     {
-        private static readonly InsertType[] InsertTypes = new[] { InsertType.Prepend, InsertType.Append };
-        private static readonly XmlNodeType[] XmlNodeTypes = new XmlNodeType[] { XmlNodeType.Whitespace, XmlNodeType.SignificantWhitespace, XmlNodeType.CDATA, XmlNodeType.Text, XmlNodeType.Comment, XmlNodeType.Element /*, XmlNodeType.EntityReference*/ };
+        private static readonly InsertType[] s_InsertTypes = new[] { InsertType.Prepend, InsertType.Append };
+        private static readonly XmlNodeType[] s_XmlNodeTypes = new XmlNodeType[] { XmlNodeType.Whitespace, XmlNodeType.SignificantWhitespace, XmlNodeType.CDATA, XmlNodeType.Text, XmlNodeType.Comment, XmlNodeType.Element /*, XmlNodeType.EntityReference*/ };
 
         private static void OneTextNodeBase(string xml, InsertType insertType, XmlNodeType nodeType)
         {
@@ -63,8 +62,8 @@ namespace XmlDocumentTests.XmlNodeTests.InsertTests
         {
             var xml = @"<W> 	
         </W>";
-            foreach (var insertType in InsertTypes)
-                foreach (var nodeType in XmlNodeTypes)
+            foreach (var insertType in s_InsertTypes)
+                foreach (var nodeType in s_XmlNodeTypes)
                     OneTextNodeBase(xml, insertType, nodeType);
         }
 
@@ -72,8 +71,8 @@ namespace XmlDocumentTests.XmlNodeTests.InsertTests
         public static void SignificantWhitespace()
         {
             var xml = @"<S xml:space=""preserve""> 	</S>";
-            foreach (var insertType in InsertTypes)
-                foreach (var nodeType in XmlNodeTypes)
+            foreach (var insertType in s_InsertTypes)
+                foreach (var nodeType in s_XmlNodeTypes)
                     OneTextNodeBase(xml, insertType, nodeType);
         }
 
@@ -82,8 +81,8 @@ namespace XmlDocumentTests.XmlNodeTests.InsertTests
         {
             var xml = @"<C><![CDATA[ &lt; &amp; <tag> < ! > & </tag> 	 ]]></C>";
 
-            foreach (var insertType in InsertTypes)
-                foreach (var nodeType in XmlNodeTypes)
+            foreach (var insertType in s_InsertTypes)
+                foreach (var nodeType in s_XmlNodeTypes)
                     OneTextNodeBase(xml, insertType, nodeType);
         }
 
@@ -92,8 +91,8 @@ namespace XmlDocumentTests.XmlNodeTests.InsertTests
         {
             var xml = @"<T>text</T>";
 
-            foreach (var insertType in InsertTypes)
-                foreach (var nodeType in XmlNodeTypes)
+            foreach (var insertType in s_InsertTypes)
+                foreach (var nodeType in s_XmlNodeTypes)
                     OneTextNodeBase(xml, insertType, nodeType);
         }
     }

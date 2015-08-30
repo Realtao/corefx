@@ -3,7 +3,6 @@
 
 using Xunit;
 using System;
-using System.IO;
 using System.Xml;
 
 namespace XmlDocumentTests.XmlDocumentTests
@@ -63,7 +62,7 @@ namespace XmlDocumentTests.XmlDocumentTests
             var decl = xmlDocument.CreateXmlDeclaration("1.0", "wrong", "yes");
         }
 
-        /*[Fact] TODO*/
+        [Fact]
         public static void InvalidStandalone()
         {
             var xmlDocument = new XmlDocument();

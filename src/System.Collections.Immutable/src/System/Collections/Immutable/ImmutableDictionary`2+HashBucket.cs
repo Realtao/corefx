@@ -1,17 +1,13 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Validation;
+using System.Globalization;
 
 namespace System.Collections.Immutable
 {
     /// <content>
-    /// Contains the inner HashBucket struct.
+    /// Contains the inner <see cref="ImmutableDictionary{TKey, TValue}.HashBucket"/> struct.
     /// </content>
     public partial class ImmutableDictionary<TKey, TValue>
     {
@@ -23,26 +19,26 @@ namespace System.Collections.Immutable
             /// <summary>
             /// One of the values in this bucket.
             /// </summary>
-            private readonly KeyValuePair<TKey, TValue> firstValue;
+            private readonly KeyValuePair<TKey, TValue> _firstValue;
 
             /// <summary>
             /// Any other elements that hash to the same value.
             /// </summary>
             /// <value>
-            /// This is null if and only if the entire bucket is empty (including <see cref="firstValue"/>).  
-            /// It's empty if <see cref="firstValue"/> has an element but no additional elements.
+            /// This is null if and only if the entire bucket is empty (including <see cref="_firstValue"/>).  
+            /// It's empty if <see cref="_firstValue"/> has an element but no additional elements.
             /// </value>
-            private readonly ImmutableList<KeyValuePair<TKey, TValue>>.Node additionalElements;
+            private readonly ImmutableList<KeyValuePair<TKey, TValue>>.Node _additionalElements;
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="ImmutableDictionary&lt;TKey, TValue&gt;.HashBucket"/> struct.
+            /// Initializes a new instance of the <see cref="ImmutableDictionary{TKey, TValue}.HashBucket"/> struct.
             /// </summary>
             /// <param name="firstElement">The first element.</param>
             /// <param name="additionalElements">The additional elements.</param>
             private HashBucket(KeyValuePair<TKey, TValue> firstElement, ImmutableList<KeyValuePair<TKey, TValue>>.Node additionalElements = null)
             {
-                this.firstValue = firstElement;
-                this.additionalElements = additionalElements ?? ImmutableList<KeyValuePair<TKey, TValue>>.Node.EmptyNode;
+                _firstValue = firstElement;
+                _additionalElements = additionalElements ?? ImmutableList<KeyValuePair<TKey, TValue>>.Node.EmptyNode;
             }
 
             /// <summary>
@@ -53,7 +49,7 @@ namespace System.Collections.Immutable
             /// </value>
             internal bool IsEmpty
             {
-                get { return this.additionalElements == null; }
+                get { return _additionalElements == null; }
             }
 
             /// <summary>
@@ -68,7 +64,7 @@ namespace System.Collections.Immutable
                         throw new InvalidOperationException();
                     }
 
-                    return this.firstValue;
+                    return _firstValue;
                 }
             }
 
@@ -77,7 +73,7 @@ namespace System.Collections.Immutable
             /// </summary>
             internal ImmutableList<KeyValuePair<TKey, TValue>>.Node AdditionalElements
             {
-                get { return this.additionalElements; }
+                get { return _additionalElements; }
             }
 
             /// <summary>
@@ -92,7 +88,7 @@ namespace System.Collections.Immutable
             /// Returns an enumerator that iterates through the collection.
             /// </summary>
             /// <returns>
-            /// A <see cref="T:System.Collections.Generic.IEnumerator`1"/> that can be used to iterate through the collection.
+            /// A <see cref="IEnumerator{T}"/> that can be used to iterate through the collection.
             /// </returns>
             IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator()
             {
@@ -103,7 +99,7 @@ namespace System.Collections.Immutable
             /// Returns an enumerator that iterates through a collection.
             /// </summary>
             /// <returns>
-            /// An <see cref="T:System.Collections.IEnumerator"/> object that can be used to iterate through the collection.
+            /// An <see cref="IEnumerator"/> object that can be used to iterate through the collection.
             /// </returns>
             IEnumerator IEnumerable.GetEnumerator()
             {
@@ -111,12 +107,12 @@ namespace System.Collections.Immutable
             }
 
             /// <summary>
-            /// Throws an exception to catch any errors in comparing HashBucket instances.
+            /// Throws an exception to catch any errors in comparing <see cref="HashBucket"/> instances.
             /// </summary>
             bool IEquatable<HashBucket>.Equals(HashBucket other)
             {
                 // This should never be called, as hash buckets don't know how to equate themselves.
-                throw new Exception();
+                throw new NotSupportedException();
             }
 
             /// <summary>
@@ -127,8 +123,8 @@ namespace System.Collections.Immutable
             /// <param name="keyOnlyComparer">The key comparer.</param>
             /// <param name="valueComparer">The value comparer.</param>
             /// <param name="behavior">The intended behavior for certain cases that may come up during the operation.</param>
-            /// <param name="result">A description of the effect was on adding an element to this HashBucket.</param>
-            /// <returns>A new HashBucket that contains the added value and any values already held by this hashbucket.</returns>
+            /// <param name="result">A description of the effect was on adding an element to this <see cref="HashBucket"/>.</param>
+            /// <returns>A new <see cref="HashBucket"/> that contains the added value and any values already held by this <see cref="HashBucket"/>.</returns>
             internal HashBucket Add(TKey key, TValue value, IEqualityComparer<KeyValuePair<TKey, TValue>> keyOnlyComparer, IEqualityComparer<TValue> valueComparer, KeyCollisionBehavior behavior, out OperationResult result)
             {
                 var kv = new KeyValuePair<TKey, TValue>(key, value);
@@ -138,36 +134,36 @@ namespace System.Collections.Immutable
                     return new HashBucket(kv);
                 }
 
-                if (keyOnlyComparer.Equals(kv, this.firstValue))
+                if (keyOnlyComparer.Equals(kv, _firstValue))
                 {
                     switch (behavior)
                     {
                         case KeyCollisionBehavior.SetValue:
                             result = OperationResult.AppliedWithoutSizeChange;
-                            return new HashBucket(kv, this.additionalElements);
+                            return new HashBucket(kv, _additionalElements);
                         case KeyCollisionBehavior.Skip:
                             result = OperationResult.NoChangeRequired;
                             return this;
                         case KeyCollisionBehavior.ThrowIfValueDifferent:
-                            if (!valueComparer.Equals(this.firstValue.Value, value))
+                            if (!valueComparer.Equals(_firstValue.Value, value))
                             {
-                                throw new ArgumentException(Strings.DuplicateKey);
+                                throw new ArgumentException(String.Format(CultureInfo.CurrentCulture, SR.DuplicateKey, key));
                             }
 
                             result = OperationResult.NoChangeRequired;
                             return this;
                         case KeyCollisionBehavior.ThrowAlways:
-                            throw new ArgumentException(Strings.DuplicateKey);
+                            throw new ArgumentException(String.Format(CultureInfo.CurrentCulture, SR.DuplicateKey, key));
                         default:
                             throw new InvalidOperationException(); // unreachable
                     }
                 }
 
-                int keyCollisionIndex = this.additionalElements.IndexOf(kv, keyOnlyComparer);
+                int keyCollisionIndex = _additionalElements.IndexOf(kv, keyOnlyComparer);
                 if (keyCollisionIndex < 0)
                 {
                     result = OperationResult.SizeChanged;
-                    return new HashBucket(this.firstValue, this.additionalElements.Add(kv));
+                    return new HashBucket(_firstValue, _additionalElements.Add(kv));
                 }
                 else
                 {
@@ -175,21 +171,21 @@ namespace System.Collections.Immutable
                     {
                         case KeyCollisionBehavior.SetValue:
                             result = OperationResult.AppliedWithoutSizeChange;
-                            return new HashBucket(this.firstValue, this.additionalElements.ReplaceAt(keyCollisionIndex, kv));
+                            return new HashBucket(_firstValue, _additionalElements.ReplaceAt(keyCollisionIndex, kv));
                         case KeyCollisionBehavior.Skip:
                             result = OperationResult.NoChangeRequired;
                             return this;
                         case KeyCollisionBehavior.ThrowIfValueDifferent:
-                            var existingEntry = this.additionalElements[keyCollisionIndex];
+                            var existingEntry = _additionalElements[keyCollisionIndex];
                             if (!valueComparer.Equals(existingEntry.Value, value))
                             {
-                                throw new ArgumentException(Strings.DuplicateKey);
+                                throw new ArgumentException(String.Format(CultureInfo.CurrentCulture, SR.DuplicateKey, key));
                             }
 
                             result = OperationResult.NoChangeRequired;
                             return this;
                         case KeyCollisionBehavior.ThrowAlways:
-                            throw new ArgumentException(Strings.DuplicateKey);
+                            throw new ArgumentException(String.Format(CultureInfo.CurrentCulture, SR.DuplicateKey, key));
                         default:
                             throw new InvalidOperationException(); // unreachable
                     }
@@ -201,8 +197,8 @@ namespace System.Collections.Immutable
             /// </summary>
             /// <param name="key">The key to remove.</param>
             /// <param name="keyOnlyComparer">The equality comparer.</param>
-            /// <param name="result">A description of the effect was on adding an element to this HashBucket.</param>
-            /// <returns>A new HashBucket that does not contain the removed value and any values already held by this hashbucket.</returns>
+            /// <param name="result">A description of the effect was on adding an element to this <see cref="HashBucket"/>.</param>
+            /// <returns>A new <see cref="HashBucket"/> that does not contain the removed value and any values already held by this <see cref="HashBucket"/>.</returns>
             internal HashBucket Remove(TKey key, IEqualityComparer<KeyValuePair<TKey, TValue>> keyOnlyComparer, out OperationResult result)
             {
                 if (this.IsEmpty)
@@ -212,9 +208,9 @@ namespace System.Collections.Immutable
                 }
 
                 var kv = new KeyValuePair<TKey, TValue>(key, default(TValue));
-                if (keyOnlyComparer.Equals(this.firstValue, kv))
+                if (keyOnlyComparer.Equals(_firstValue, kv))
                 {
-                    if (this.additionalElements.IsEmpty)
+                    if (_additionalElements.IsEmpty)
                     {
                         result = OperationResult.SizeChanged;
                         return new HashBucket();
@@ -223,13 +219,13 @@ namespace System.Collections.Immutable
                     {
                         // We can promote any element from the list into the first position, but it's most efficient
                         // to remove the root node in the binary tree that implements the list.
-                        int indexOfRootNode = ((IBinaryTree<KeyValuePair<TKey, TValue>>)this.additionalElements).Left.Count;
+                        int indexOfRootNode = _additionalElements.Left.Count;
                         result = OperationResult.SizeChanged;
-                        return new HashBucket(this.additionalElements.Key, this.additionalElements.RemoveAt(indexOfRootNode));
+                        return new HashBucket(_additionalElements.Key, _additionalElements.RemoveAt(indexOfRootNode));
                     }
                 }
 
-                int index = this.additionalElements.IndexOf(kv, keyOnlyComparer);
+                int index = _additionalElements.IndexOf(kv, keyOnlyComparer);
                 if (index < 0)
                 {
                     result = OperationResult.NoChangeRequired;
@@ -238,7 +234,7 @@ namespace System.Collections.Immutable
                 else
                 {
                     result = OperationResult.SizeChanged;
-                    return new HashBucket(this.firstValue, this.additionalElements.RemoveAt(index));
+                    return new HashBucket(_firstValue, _additionalElements.RemoveAt(index));
                 }
             }
 
@@ -258,20 +254,20 @@ namespace System.Collections.Immutable
                 }
 
                 var kv = new KeyValuePair<TKey, TValue>(key, default(TValue));
-                if (keyOnlyComparer.Equals(this.firstValue, kv))
+                if (keyOnlyComparer.Equals(_firstValue, kv))
                 {
-                    value = this.firstValue.Value;
+                    value = _firstValue.Value;
                     return true;
                 }
 
-                var index = this.additionalElements.IndexOf(kv, keyOnlyComparer);
+                var index = _additionalElements.IndexOf(kv, keyOnlyComparer);
                 if (index < 0)
                 {
                     value = default(TValue);
                     return false;
                 }
 
-                value = this.additionalElements[index].Value;
+                value = _additionalElements[index].Value;
                 return true;
             }
 
@@ -297,20 +293,20 @@ namespace System.Collections.Immutable
                 }
 
                 var kv = new KeyValuePair<TKey, TValue>(equalKey, default(TValue));
-                if (keyOnlyComparer.Equals(this.firstValue, kv))
+                if (keyOnlyComparer.Equals(_firstValue, kv))
                 {
-                    actualKey = this.firstValue.Key;
+                    actualKey = _firstValue.Key;
                     return true;
                 }
 
-                var index = this.additionalElements.IndexOf(kv, keyOnlyComparer);
+                var index = _additionalElements.IndexOf(kv, keyOnlyComparer);
                 if (index < 0)
                 {
                     actualKey = equalKey;
                     return false;
                 }
 
-                actualKey = this.additionalElements[index].Key;
+                actualKey = _additionalElements[index].Key;
                 return true;
             }
 
@@ -319,9 +315,9 @@ namespace System.Collections.Immutable
             /// </summary>
             internal void Freeze()
             {
-                if (this.additionalElements != null)
+                if (_additionalElements != null)
                 {
-                    this.additionalElements.Freeze();
+                    _additionalElements.Freeze();
                 }
             }
 
@@ -333,27 +329,27 @@ namespace System.Collections.Immutable
                 /// <summary>
                 /// The bucket being enumerated.
                 /// </summary>
-                private readonly HashBucket bucket;
+                private readonly HashBucket _bucket;
 
                 /// <summary>
                 /// The current position of this enumerator.
                 /// </summary>
-                private Position currentPosition;
+                private Position _currentPosition;
 
                 /// <summary>
-                /// The enumerator that represents the current position over the additionalValues of the HashBucket.
+                /// The enumerator that represents the current position over the <see cref="_additionalElements"/> of the <see cref="HashBucket"/>.
                 /// </summary>
-                private ImmutableList<KeyValuePair<TKey, TValue>>.Enumerator additionalEnumerator;
+                private ImmutableList<KeyValuePair<TKey, TValue>>.Enumerator _additionalEnumerator;
 
                 /// <summary>
-                /// Initializes a new instance of the <see cref="ImmutableDictionary&lt;TKey, TValue&gt;.HashBucket.Enumerator"/> struct.
+                /// Initializes a new instance of the <see cref="ImmutableDictionary{TKey, TValue}.HashBucket.Enumerator"/> struct.
                 /// </summary>
                 /// <param name="bucket">The bucket.</param>
                 internal Enumerator(HashBucket bucket)
                 {
-                    this.bucket = bucket;
-                    this.currentPosition = Position.BeforeFirst;
-                    this.additionalEnumerator = default(ImmutableList<KeyValuePair<TKey, TValue>>.Enumerator);
+                    _bucket = bucket;
+                    _currentPosition = Position.BeforeFirst;
+                    _additionalEnumerator = default(ImmutableList<KeyValuePair<TKey, TValue>>.Enumerator);
                 }
 
                 /// <summary>
@@ -367,12 +363,12 @@ namespace System.Collections.Immutable
                     BeforeFirst,
 
                     /// <summary>
-                    /// We're at the firstValue of the containing bucket.
+                    /// We're at the <see cref="_firstValue"/> of the containing bucket.
                     /// </summary>
                     First,
 
                     /// <summary>
-                    /// We're enumerating the additionalValues in the bucket.
+                    /// We're enumerating the <see cref="_additionalElements"/> in the bucket.
                     /// </summary>
                     Additional,
 
@@ -397,12 +393,12 @@ namespace System.Collections.Immutable
                 {
                     get
                     {
-                        switch (this.currentPosition)
+                        switch (_currentPosition)
                         {
                             case Position.First:
-                                return this.bucket.firstValue;
+                                return _bucket._firstValue;
                             case Position.Additional:
-                                return this.additionalEnumerator.Current;
+                                return _additionalEnumerator.Current;
                             default:
                                 throw new InvalidOperationException();
                         }
@@ -415,32 +411,32 @@ namespace System.Collections.Immutable
                 /// <returns>
                 /// true if the enumerator was successfully advanced to the next element; false if the enumerator has passed the end of the collection.
                 /// </returns>
-                /// <exception cref="T:System.InvalidOperationException">The collection was modified after the enumerator was created. </exception>
+                /// <exception cref="InvalidOperationException">The collection was modified after the enumerator was created. </exception>
                 public bool MoveNext()
                 {
-                    if (this.bucket.IsEmpty)
+                    if (_bucket.IsEmpty)
                     {
-                        this.currentPosition = Position.End;
+                        _currentPosition = Position.End;
                         return false;
                     }
 
-                    switch (this.currentPosition)
+                    switch (_currentPosition)
                     {
                         case Position.BeforeFirst:
-                            this.currentPosition = Position.First;
+                            _currentPosition = Position.First;
                             return true;
                         case Position.First:
-                            if (this.bucket.additionalElements.IsEmpty)
+                            if (_bucket._additionalElements.IsEmpty)
                             {
-                                this.currentPosition = Position.End;
+                                _currentPosition = Position.End;
                                 return false;
                             }
 
-                            this.currentPosition = Position.Additional;
-                            this.additionalEnumerator = new ImmutableList<KeyValuePair<TKey, TValue>>.Enumerator(this.bucket.additionalElements);
-                            return this.additionalEnumerator.MoveNext();
+                            _currentPosition = Position.Additional;
+                            _additionalEnumerator = new ImmutableList<KeyValuePair<TKey, TValue>>.Enumerator(_bucket._additionalElements);
+                            return _additionalEnumerator.MoveNext();
                         case Position.Additional:
-                            return this.additionalEnumerator.MoveNext();
+                            return _additionalEnumerator.MoveNext();
                         case Position.End:
                             return false;
                         default:
@@ -451,13 +447,13 @@ namespace System.Collections.Immutable
                 /// <summary>
                 /// Sets the enumerator to its initial position, which is before the first element in the collection.
                 /// </summary>
-                /// <exception cref="T:System.InvalidOperationException">The collection was modified after the enumerator was created. </exception>
+                /// <exception cref="InvalidOperationException">The collection was modified after the enumerator was created. </exception>
                 public void Reset()
                 {
                     // We can safely dispose of the additional enumerator because if the client reuses this enumerator
                     // we'll acquire a new one anyway (and so for that matter we should be sure to dispose of this).  
-                    this.additionalEnumerator.Dispose();
-                    this.currentPosition = Position.BeforeFirst;
+                    _additionalEnumerator.Dispose();
+                    _currentPosition = Position.BeforeFirst;
                 }
 
                 /// <summary>
@@ -465,7 +461,7 @@ namespace System.Collections.Immutable
                 /// </summary>
                 public void Dispose()
                 {
-                    this.additionalEnumerator.Dispose();
+                    _additionalEnumerator.Dispose();
                 }
             }
         }

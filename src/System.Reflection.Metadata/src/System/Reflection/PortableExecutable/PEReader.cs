@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection.Internal;
 using System.Reflection.Metadata;
-using System.Text;
 using System.Threading;
 
 namespace System.Reflection.PortableExecutable
@@ -23,14 +22,14 @@ namespace System.Reflection.PortableExecutable
         // May be null in the event that the entire image is not
         // deemed necessary and we have been instructed to read
         // the image contents without being lazy.
-        private MemoryBlockProvider peImage;
+        private MemoryBlockProvider _peImage;
 
         // If we read the data from the image lazily (peImage != null) we defer reading the PE headers.
-        private PEHeaders lazyPEHeaders;
+        private PEHeaders _lazyPEHeaders;
 
-        private AbstractMemoryBlock lazyMetadataBlock;
-        private AbstractMemoryBlock lazyImageBlock;
-        private AbstractMemoryBlock[] lazyPESectionBlocks;
+        private AbstractMemoryBlock _lazyMetadataBlock;
+        private AbstractMemoryBlock _lazyImageBlock;
+        private AbstractMemoryBlock[] _lazyPESectionBlocks;
 
         /// <summary>
         /// Creates a Portable Executable reader over a PE image stored in memory.
@@ -56,7 +55,7 @@ namespace System.Reflection.PortableExecutable
                 throw new ArgumentOutOfRangeException("size");
             }
 
-            this.peImage = new ExternalMemoryBlockProvider(peImage, size);
+            _peImage = new ExternalMemoryBlockProvider(peImage, size);
         }
 
         /// <summary>
@@ -141,7 +140,7 @@ namespace System.Reflection.PortableExecutable
 
             if (!peStream.CanRead || !peStream.CanSeek)
             {
-                throw new ArgumentException(MetadataResources.StreamMustSupportReadAndSeek, "peStream");
+                throw new ArgumentException(SR.StreamMustSupportReadAndSeek, "peStream");
             }
 
             if (!options.IsValid())
@@ -159,7 +158,7 @@ namespace System.Reflection.PortableExecutable
 
                 if ((options & (PEStreamOptions.PrefetchMetadata | PEStreamOptions.PrefetchEntireImage)) == 0)
                 {
-                    this.peImage = new StreamMemoryBlockProvider(peStream, start, size, isFileStream, (options & PEStreamOptions.LeaveOpen) != 0);
+                    _peImage = new StreamMemoryBlockProvider(peStream, start, size, isFileStream, (options & PEStreamOptions.LeaveOpen) != 0);
                     closeStream = false;
                 }
                 else
@@ -168,8 +167,8 @@ namespace System.Reflection.PortableExecutable
                     if ((options & PEStreamOptions.PrefetchEntireImage) != 0)
                     {
                         var imageBlock = StreamMemoryBlockProvider.ReadMemoryBlockNoLock(peStream, isFileStream, 0, (int)Math.Min(peStream.Length, int.MaxValue));
-                        this.lazyImageBlock = imageBlock;
-                        this.peImage = new ExternalMemoryBlockProvider(imageBlock.Pointer, imageBlock.Size);
+                        _lazyImageBlock = imageBlock;
+                        _peImage = new ExternalMemoryBlockProvider(imageBlock.Pointer, imageBlock.Size);
 
                         // if the caller asked for metadata initialize the PE headers (calculates metadata offset):
                         if ((options & PEStreamOptions.PrefetchMetadata) != 0)
@@ -180,8 +179,8 @@ namespace System.Reflection.PortableExecutable
                     else
                     {
                         // The peImage is left null, but the lazyMetadataBlock is initialized up front.
-                        this.lazyPEHeaders = new PEHeaders(peStream);
-                        this.lazyMetadataBlock = StreamMemoryBlockProvider.ReadMemoryBlockNoLock(peStream, isFileStream, lazyPEHeaders.MetadataStartOffset, lazyPEHeaders.MetadataSize);
+                        _lazyPEHeaders = new PEHeaders(peStream);
+                        _lazyMetadataBlock = StreamMemoryBlockProvider.ReadMemoryBlockNoLock(peStream, isFileStream, _lazyPEHeaders.MetadataStartOffset, _lazyPEHeaders.MetadataSize);
                     }
                     // We read all we need, the stream is going to be closed.
                 }
@@ -210,41 +209,41 @@ namespace System.Reflection.PortableExecutable
                 throw new ArgumentNullException("peImage");
             }
 
-            this.peImage = new ByteArrayMemoryProvider(peImage);
+            _peImage = new ByteArrayMemoryProvider(peImage);
         }
 
         /// <summary>
         /// Disposes all memory allocated by the reader.
         /// </summary>
         /// <remarks>
-        /// <see cref="Dispose"/>  can be called multiple times (even in parallel). 
-        /// However, it is not safe to call <see cref="Dispose"/> in parallel with any other operation on the <see cref="PEReader"/>
+        /// <see cref="Dispose"/>  can be called multiple times (but not in parallel).
+        /// It is not safe to call <see cref="Dispose"/> in parallel with any other operation on the <see cref="PEReader"/>
         /// or reading from <see cref="PEMemoryBlock"/>s retrieved from the reader.
         /// </remarks>
         public void Dispose()
         {
-            var image = peImage;
+            var image = _peImage;
             if (image != null)
             {
                 image.Dispose();
-                peImage = null;
+                _peImage = null;
             }
 
-            var imageBlock = lazyImageBlock;
+            var imageBlock = _lazyImageBlock;
             if (imageBlock != null)
             {
                 imageBlock.Dispose();
-                lazyImageBlock = null;
+                _lazyImageBlock = null;
             }
 
-            var metadataBlock = lazyMetadataBlock;
+            var metadataBlock = _lazyMetadataBlock;
             if (metadataBlock != null)
             {
                 metadataBlock.Dispose();
-                lazyMetadataBlock = null;
+                _lazyMetadataBlock = null;
             }
 
-            var peSectionBlocks = lazyPESectionBlocks;
+            var peSectionBlocks = _lazyPESectionBlocks;
             if (peSectionBlocks != null)
             {
                 foreach (var block in peSectionBlocks)
@@ -255,7 +254,7 @@ namespace System.Reflection.PortableExecutable
                     }
                 }
 
-                lazyPESectionBlocks = null;
+                _lazyPESectionBlocks = null;
             }
         }
 
@@ -267,21 +266,21 @@ namespace System.Reflection.PortableExecutable
         {
             get
             {
-                if (lazyPEHeaders == null)
+                if (_lazyPEHeaders == null)
                 {
                     InitializePEHeaders();
                 }
 
-                return lazyPEHeaders;
+                return _lazyPEHeaders;
             }
         }
 
         private void InitializePEHeaders()
         {
-            Debug.Assert(peImage != null);
+            Debug.Assert(_peImage != null);
 
             StreamConstraints constraints;
-            Stream stream = peImage.GetStream(out constraints);
+            Stream stream = _peImage.GetStream(out constraints);
 
             PEHeaders headers;
             if (constraints.GuardOpt != null)
@@ -296,7 +295,7 @@ namespace System.Reflection.PortableExecutable
                 headers = ReadPEHeadersNoLock(stream, constraints.ImageStart, constraints.ImageSize);
             }
 
-            Interlocked.CompareExchange(ref lazyPEHeaders, headers, null);
+            Interlocked.CompareExchange(ref _lazyPEHeaders, headers, null);
         }
 
         private static PEHeaders ReadPEHeadersNoLock(Stream stream, long imageStartPosition, int imageSize)
@@ -312,67 +311,67 @@ namespace System.Reflection.PortableExecutable
         /// <exception cref="InvalidOperationException">PE image not available.</exception>
         private AbstractMemoryBlock GetEntireImageBlock()
         {
-            if (lazyImageBlock == null)
+            if (_lazyImageBlock == null)
             {
-                if (peImage == null)
+                if (_peImage == null)
                 {
-                    throw new InvalidOperationException(MetadataResources.PEImageNotAvailable);
+                    throw new InvalidOperationException(SR.PEImageNotAvailable);
                 }
 
-                var newBlock = peImage.GetMemoryBlock();
-                if (Interlocked.CompareExchange(ref lazyImageBlock, newBlock, null) != null)
+                var newBlock = _peImage.GetMemoryBlock();
+                if (Interlocked.CompareExchange(ref _lazyImageBlock, newBlock, null) != null)
                 {
                     // another thread created the block already, we need to dispose ours:
                     newBlock.Dispose();
                 }
             }
 
-            return lazyImageBlock;
+            return _lazyImageBlock;
         }
 
         private AbstractMemoryBlock GetMetadataBlock()
         {
             if (!HasMetadata)
             {
-                throw new InvalidOperationException(MetadataResources.PEImageDoesNotHaveMetadata);
+                throw new InvalidOperationException(SR.PEImageDoesNotHaveMetadata);
             }
 
-            if (lazyMetadataBlock == null)
+            if (_lazyMetadataBlock == null)
             {
-                Debug.Assert(peImage != null, "We always have metadata if peImage is not available.");
+                Debug.Assert(_peImage != null, "We always have metadata if peImage is not available.");
 
-                var newBlock = peImage.GetMemoryBlock(PEHeaders.MetadataStartOffset, PEHeaders.MetadataSize);
-                if (Interlocked.CompareExchange(ref lazyMetadataBlock, newBlock, null) != null)
+                var newBlock = _peImage.GetMemoryBlock(PEHeaders.MetadataStartOffset, PEHeaders.MetadataSize);
+                if (Interlocked.CompareExchange(ref _lazyMetadataBlock, newBlock, null) != null)
                 {
                     // another thread created the block already, we need to dispose ours:
                     newBlock.Dispose();
                 }
             }
 
-            return lazyMetadataBlock;
+            return _lazyMetadataBlock;
         }
 
         private AbstractMemoryBlock GetPESectionBlock(int index)
         {
             Debug.Assert(index >= 0 && index < PEHeaders.SectionHeaders.Length);
-            Debug.Assert(peImage != null);
+            Debug.Assert(_peImage != null);
 
-            if (lazyPESectionBlocks == null)
+            if (_lazyPESectionBlocks == null)
             {
-                Interlocked.CompareExchange(ref lazyPESectionBlocks, new AbstractMemoryBlock[PEHeaders.SectionHeaders.Length], null);
+                Interlocked.CompareExchange(ref _lazyPESectionBlocks, new AbstractMemoryBlock[PEHeaders.SectionHeaders.Length], null);
             }
 
-            var newBlock = peImage.GetMemoryBlock(
+            var newBlock = _peImage.GetMemoryBlock(
                 PEHeaders.SectionHeaders[index].PointerToRawData,
                 PEHeaders.SectionHeaders[index].SizeOfRawData);
 
-            if (Interlocked.CompareExchange(ref lazyPESectionBlocks[index], newBlock, null) != null)
+            if (Interlocked.CompareExchange(ref _lazyPESectionBlocks[index], newBlock, null) != null)
             {
                 // another thread created the block already, we need to dispose ours:
                 newBlock.Dispose();
             }
 
-            return lazyPESectionBlocks[index];
+            return _lazyPESectionBlocks[index];
         }
 
         /// <summary>
@@ -383,7 +382,7 @@ namespace System.Reflection.PortableExecutable
         /// </remarks>
         public bool IsEntireImageAvailable
         {
-            get { return lazyImageBlock != null || peImage != null; }
+            get { return _lazyImageBlock != null || _peImage != null; }
         }
 
         /// <summary>
@@ -435,7 +434,7 @@ namespace System.Reflection.PortableExecutable
             int size = PEHeaders.SectionHeaders[sectionIndex].VirtualSize - relativeOffset;
 
             AbstractMemoryBlock block;
-            if (peImage != null)
+            if (_peImage != null)
             {
                 block = GetPESectionBlock(sectionIndex);
             }

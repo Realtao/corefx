@@ -3,10 +3,10 @@
 // This file is auto-generated, do not make permanent modifications.
 
 using System;
-using Xunit;
 using System.Globalization;
-using System.Reflection;
 using System.Linq;
+using System.Reflection;
+using Xunit;
 
 namespace System.Numerics.Tests
 {
@@ -47,6 +47,8 @@ namespace System.Numerics.Tests
 
         private void TestConstructor<T>() where T : struct
         {
+            Assert.Throws<NullReferenceException>(() => new Vector<T>((T[])null));
+
             T[] values = GenerateRandomValuesForVector<T>();
             var vector = new Vector<T>(values);
             ValidateVector(
@@ -79,6 +81,8 @@ namespace System.Numerics.Tests
         public void ConstructorWithOffsetDouble() { TestConstructorWithOffset<Double>(); }
         private void TestConstructorWithOffset<T>() where T : struct
         {
+            Assert.Throws<NullReferenceException>(() => new Vector<T>((T[])null, 0));
+
             int offsetAmount = Util.GenerateSingleValue<int>(2, 250);
             T[] values = new T[offsetAmount].Concat(GenerateRandomValuesForVector<T>()).ToArray();
             var vector = new Vector<T>(values, offsetAmount);
@@ -302,6 +306,12 @@ namespace System.Numerics.Tests
             var initialValues = GenerateRandomValuesForVector<T>();
             var vector = new Vector<T>(initialValues);
             T[] array = new T[Vector<T>.Count];
+
+            Assert.Throws<NullReferenceException>(() => vector.CopyTo(null, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => vector.CopyTo(array, -1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => vector.CopyTo(array, array.Length));
+            Assert.Throws<ArgumentException>(() => vector.CopyTo(array, array.Length - 1));
+
             vector.CopyTo(array);
             for (int g = 0; g < array.Length; g++)
             {
@@ -371,11 +381,12 @@ namespace System.Numerics.Tests
             T[] values = GenerateRandomValuesForVector<T>();
             Vector<T> vector1 = new Vector<T>(values);
 
-            string stringObject = "This is not a Vector<T> object.";
+            const string stringObject = "This is not a Vector<T> object.";
             DateTime dateTimeObject = DateTime.UtcNow;
 
             Assert.False(vector1.Equals(stringObject));
             Assert.False(vector1.Equals(dateTimeObject));
+            Assert.True(vector1.Equals((object)vector1));
 
             if (typeof(T) != typeof(Int32))
             {
@@ -2186,6 +2197,34 @@ namespace System.Numerics.Tests
                 Assert.Equal(values[g], array[g + offset]);
                 Assert.Equal(vector[g], array[g + offset]);
             }
+        }
+
+        [Fact]
+        public void CountViaReflectionConsistencyByte() { TestCountViaReflectionConsistency<Byte>(); }
+        [Fact]
+        public void CountViaReflectionConsistencySByte() { TestCountViaReflectionConsistency<SByte>(); }
+        [Fact]
+        public void CountViaReflectionConsistencyUInt16() { TestCountViaReflectionConsistency<UInt16>(); }
+        [Fact]
+        public void CountViaReflectionConsistencyInt16() { TestCountViaReflectionConsistency<Int16>(); }
+        [Fact]
+        public void CountViaReflectionConsistencyUInt32() { TestCountViaReflectionConsistency<UInt32>(); }
+        [Fact]
+        public void CountViaReflectionConsistencyInt32() { TestCountViaReflectionConsistency<Int32>(); }
+        [Fact]
+        public void CountViaReflectionConsistencyUInt64() { TestCountViaReflectionConsistency<UInt64>(); }
+        [Fact]
+        public void CountViaReflectionConsistencyInt64() { TestCountViaReflectionConsistency<Int64>(); }
+        [Fact]
+        public void CountViaReflectionConsistencySingle() { TestCountViaReflectionConsistency<Single>(); }
+        [Fact]
+        public void CountViaReflectionConsistencyDouble() { TestCountViaReflectionConsistency<Double>(); }
+        private void TestCountViaReflectionConsistency<T>() where T : struct
+        {
+            MethodInfo countMethod = typeof(Vector<T>).GetTypeInfo().GetDeclaredProperty("Count").GetMethod;
+            int valueFromReflection = (int)countMethod.Invoke(null, null);
+            int valueFromNormalCall = Vector<T>.Count;
+            Assert.Equal(valueFromNormalCall, valueFromReflection);
         }
         #endregion Reflection Tests
 

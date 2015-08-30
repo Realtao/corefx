@@ -21,7 +21,10 @@ bld/
 [Oo]bj/
 msbuild.log
 
-# Roslyn stuff
+# Visual Studio 2015
+.vs/
+
+# Visual Studio 2015 Pre-CTP6
 *.sln.ide
 *.ide/
 
@@ -144,7 +147,6 @@ csx/
 AppPackages/
 
 # Others
-sql/
 *.Cache
 ClientBin/
 [Ss]tyle[Cc]op.*
@@ -179,6 +181,11 @@ UpgradeLog*.htm
 
 # Microsoft Fakes
 FakesAssemblies/
+
+### MonoDevelop ###
+
+*.pidb
+*.userprefs
 
 ### Windows ###
 
@@ -230,3 +237,11 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# vim temporary files
+[._]*.s[a-w][a-z]
+[._]s[a-w][a-z]
+*.un~
+Session.vim
+.netrwhist
+*~

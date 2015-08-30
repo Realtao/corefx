@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using Xunit;
@@ -156,6 +156,26 @@ namespace System.Collections.Immutable.Test
             this.TryGetValueTestHelper(ImmutableHashSet<string>.Empty.WithComparer(StringComparer.OrdinalIgnoreCase));
         }
 
+        [Fact]
+        public void DebuggerAttributesValid()
+        {
+            DebuggerAttributes.ValidateDebuggerDisplayReferences(ImmutableHashSet.Create<string>());
+            DebuggerAttributes.ValidateDebuggerTypeProxyProperties(ImmutableHashSet.Create<int>(1, 2, 3));
+        }
+
+        [Fact]
+        public void SymmetricExceptWithComparerTests()
+        {
+            var set = ImmutableHashSet.Create<string>("a").WithComparer(StringComparer.OrdinalIgnoreCase);
+            var otherCollection = new[] {"A"};
+
+            var expectedSet = new HashSet<string>(set, set.KeyComparer);
+            expectedSet.SymmetricExceptWith(otherCollection);
+
+            var actualSet = set.SymmetricExcept(otherCollection);
+            CollectionAssertAreEquivalent(expectedSet.ToList(), actualSet.ToList());
+        }
+
         protected override IImmutableSet<T> Empty<T>()
         {
             return ImmutableHashSet<T>.Empty;
@@ -169,6 +189,11 @@ namespace System.Collections.Immutable.Test
         protected override ISet<T> EmptyMutable<T>()
         {
             return new HashSet<T>();
+        }
+
+        internal override IBinaryTree GetRootNode<T>(IImmutableSet<T> set)
+        {
+            return ((ImmutableHashSet<T>)set).Root;
         }
 
         /// <summary>

@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using Xunit;
 
@@ -19,13 +20,14 @@ namespace TestUtilities
         #region AssertEqualityComparer<T>
         private class AssertEqualityComparer<T> : IEqualityComparer<T>
         {
-            private readonly static IEqualityComparer<T> instance = new AssertEqualityComparer<T>();
+            private readonly static IEqualityComparer<T> s_instance = new AssertEqualityComparer<T>();
 
             private static bool CanBeNull()
             {
                 var type = typeof(T);
-                return !type.IsValueType ||
-                    (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>));
+                var typeInfo = type.GetTypeInfo();
+                return !typeInfo.IsValueType ||
+                    (typeInfo.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>));
             }
 
             public static bool IsNull(T @object)
@@ -40,7 +42,7 @@ namespace TestUtilities
 
             public static bool Equals(T left, T right)
             {
-                return instance.Equals(left, right);
+                return s_instance.Equals(left, right);
             }
 
             bool IEqualityComparer<T>.Equals(T x, T y)
@@ -124,11 +126,11 @@ namespace TestUtilities
 
             if (expected == null)
             {
-                Fail("expected was null, but actual wasn't\r\n" + message);
+                Fail("expected was null, but actual wasn't" + Environment.NewLine + message);
             }
             else if (actual == null)
             {
-                Fail("actual was null, but expected wasn't\r\n" + message);
+                Fail("actual was null, but expected wasn't" + Environment.NewLine + message);
             }
             else
             {
@@ -136,9 +138,9 @@ namespace TestUtilities
                     comparer.Equals(expected, actual) :
                     AssertEqualityComparer<T>.Equals(expected, actual)))
                 {
-                    Fail("Expected and actual were different.\r\n" +
-                         "Expected: " + expected + "\r\n" +
-                         "Actual:   " + actual + "\r\n" +
+                    Fail("Expected and actual were different." + Environment.NewLine +
+                         "Expected: " + expected + Environment.NewLine +
+                         "Actual:   " + actual + Environment.NewLine +
                          message);
                 }
             }
@@ -178,8 +180,13 @@ namespace TestUtilities
             Equal((IEnumerable<T>)expected, (IEnumerable<T>)actual, comparer, message, itemSeparator);
         }
 
-        public static void Equal<T>(IEnumerable<T> expected, IEnumerable<T> actual, IEqualityComparer<T> comparer = null, string message = null,
-            string itemSeparator = ",\r\n", Func<T, string> itemInspector = null)
+        public static void Equal<T>(IEnumerable<T> expected, IEnumerable<T> actual, IEqualityComparer<T> comparer = null, string message = null)
+        {
+            Equal(expected, actual, comparer, message, "," + Environment.NewLine);
+        }
+
+        public static void Equal<T>(IEnumerable<T> expected, IEnumerable<T> actual, IEqualityComparer<T> comparer, string message,
+            string itemSeparator, Func<T, string> itemInspector = null)
         {
             if (ReferenceEquals(expected, actual))
             {
@@ -188,11 +195,11 @@ namespace TestUtilities
 
             if (expected == null)
             {
-                Fail("expected was null, but actual wasn't\r\n" + message);
+                Fail("expected was null, but actual wasn't" + Environment.NewLine + message);
             }
             else if (actual == null)
             {
-                Fail("actual was null, but expected wasn't\r\n" + message);
+                Fail("actual was null, but expected wasn't" + Environment.NewLine + message);
             }
             else
             {
@@ -202,7 +209,7 @@ namespace TestUtilities
 
                     if (message != null)
                     {
-                        assertMessage = message + "\r\n" + assertMessage;
+                        assertMessage = message + Environment.NewLine + assertMessage;
                     }
 
                     Assert.True(false, assertMessage);
@@ -385,7 +392,7 @@ namespace TestUtilities
                     return;
                 }
 
-                if (allowDerived && typeof(T).IsAssignableFrom(type))
+                if (allowDerived && typeof(T).GetTypeInfo().IsAssignableFrom(type.GetTypeInfo()))
                 {
                     // We got a derived type
                     return;
@@ -441,10 +448,10 @@ namespace TestUtilities
 
         public static string GetAssertMessage<T>(IEnumerable<T> expected, IEnumerable<T> actual, bool escapeQuotes)
         {
-            return GetAssertMessage(expected, actual, toString: escapeQuotes ? new Func<T, string>(t => t.ToString().Replace("\"", "\"\"")) : null, separator: "\r\n");
+            return GetAssertMessage(expected, actual, null, escapeQuotes ? new Func<T, string>(t => t.ToString().Replace("\"", "\"\"")) : null, Environment.NewLine);
         }
 
-        public static string GetAssertMessage<T>(IEnumerable<T> expected, IEnumerable<T> actual, IEqualityComparer<T> comparer = null, Func<T, string> toString = null, string separator = ",\r\n")
+        public static string GetAssertMessage<T>(IEnumerable<T> expected, IEnumerable<T> actual, IEqualityComparer<T> comparer, Func<T, string> toString, string separator)
         {
             if (toString == null)
             {

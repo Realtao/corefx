@@ -1,11 +1,9 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using Xunit;
-using System.Numerics;
-using System.Globalization;
 
 namespace System.Numerics.Tests
 {
@@ -949,34 +947,39 @@ namespace System.Numerics.Tests
         [StructLayout(LayoutKind.Sequential)]
         struct Quaternion_2x
         {
-            Quaternion a;
-            Quaternion b;
+            private Quaternion _a;
+            private Quaternion _b;
         }
 
         [StructLayout(LayoutKind.Sequential)]
         struct QuaternionPlusFloat
         {
-            Quaternion v;
-            float f;
+            private Quaternion _v;
+            private float _f;
         }
 
         [StructLayout(LayoutKind.Sequential)]
         struct QuaternionPlusFloat_2x
         {
-            QuaternionPlusFloat a;
-            QuaternionPlusFloat b;
+            private QuaternionPlusFloat _a;
+            private QuaternionPlusFloat _b;
         }
 
-        //// A test to make sure the fields are laid out how we expect
-        //[Fact]
-        //public unsafe void QuaternionFieldOffsetTest()
-        //{
-        //    Quaternion* ptr = (Quaternion*)0;
+        // A test to make sure the fields are laid out how we expect
+        [Fact]
+        public unsafe void QuaternionFieldOffsetTest()
+        {
+            Quaternion quat = new Quaternion();
 
-        //    Assert.Equal(new IntPtr(0), new IntPtr(&ptr->X));
-        //    Assert.Equal(new IntPtr(4), new IntPtr(&ptr->Y));
-        //    Assert.Equal(new IntPtr(8), new IntPtr(&ptr->Z));
-        //    Assert.Equal(new IntPtr(12), new IntPtr(&ptr->W));
-        //}
+            float* basePtr = &quat.X; // Take address of first element
+            Quaternion* quatPtr = &quat; // Take address of whole Quaternion
+
+            Assert.Equal(new IntPtr(basePtr), new IntPtr(quatPtr));
+
+            Assert.Equal(new IntPtr(basePtr + 0), new IntPtr(&quat.X));
+            Assert.Equal(new IntPtr(basePtr + 1), new IntPtr(&quat.Y));
+            Assert.Equal(new IntPtr(basePtr + 2), new IntPtr(&quat.Z));
+            Assert.Equal(new IntPtr(basePtr + 3), new IntPtr(&quat.W));
+        }
     }
 }

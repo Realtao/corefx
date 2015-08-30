@@ -45,7 +45,7 @@ namespace System.Numerics
         /// </summary>
         /// <param name="w">W component.</param>
         /// <param name="x">X component.</param>
-        /// <param name="y">Y conponent.</param>
+        /// <param name="y">Y component.</param>
         /// <param name="z">Z component.</param>
         [JitIntrinsic]
         public Vector4(Single x, Single y, Single z, Single w)
@@ -106,11 +106,18 @@ namespace System.Numerics
         public void CopyTo(Single[] array, int index)
         {
             if (array == null)
-                throw new ArgumentNullException("values");
+            {
+                // Match the JIT's exception type here. For perf, a NullReference is thrown instead of an ArgumentNull.
+                throw new NullReferenceException(SR.Arg_NullArgumentNullRef);
+            }
             if (index < 0 || index >= array.Length)
-                throw new ArgumentOutOfRangeException(SR.GetString("Arg_ArgumentOutOfRangeException", index));
+            {
+                throw new ArgumentOutOfRangeException(SR.Format(SR.Arg_ArgumentOutOfRangeException, index));
+            }
             if ((array.Length - index) < 4)
-                throw new ArgumentException(SR.GetString("Arg_ElementsInSourceIsGreaterThanDestination", index));
+            {
+                throw new ArgumentException(SR.Format(SR.Arg_ElementsInSourceIsGreaterThanDestination, index));
+            }
             array[index] = X;
             array[index + 1] = Y;
             array[index + 2] = Z;
@@ -196,7 +203,7 @@ namespace System.Numerics
         }
 
         /// <summary>
-        /// Returns a vector whose elements are the square root of each of hte source vector's elements.
+        /// Returns a vector whose elements are the square root of each of the source vector's elements.
         /// </summary>
         /// <param name="value">The source vector.</param>
         /// <returns>The square root vector.</returns>

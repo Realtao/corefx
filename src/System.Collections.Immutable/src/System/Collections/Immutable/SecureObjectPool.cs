@@ -1,12 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Threading.Tasks;
 using Validation;
 
 namespace System.Collections.Immutable
@@ -19,7 +15,7 @@ namespace System.Collections.Immutable
         /// <summary>
         /// The ever-incrementing (and wrap-on-overflow) integer for owner id's.
         /// </summary>
-        private static int poolUserIdCounter;
+        private static int s_poolUserIdCounter;
 
         /// <summary>
         /// The ID reserved for unassigned objects.
@@ -34,7 +30,7 @@ namespace System.Collections.Immutable
             int result;
             do
             {
-                result = Interlocked.Increment(ref poolUserIdCounter);
+                result = Interlocked.Increment(ref s_poolUserIdCounter);
             }
             while (result == UnassignedId);
 
@@ -85,13 +81,13 @@ namespace System.Collections.Immutable
 
     internal class SecurePooledObject<T>
     {
-        private readonly T value;
-        private int owner;
+        private readonly T _value;
+        private int _owner;
 
         internal SecurePooledObject(T newValue)
         {
             Requires.NotNullAllowStructs(newValue, "newValue");
-            this.value = newValue;
+            _value = newValue;
         }
 
         /// <summary>
@@ -99,43 +95,45 @@ namespace System.Collections.Immutable
         /// </summary>
         internal int Owner
         {
-            get { return this.owner; }
-            set { this.owner = value; }
+            get { return _owner; }
+            set { _owner = value; }
         }
 
-        internal SecurePooledObjectUser Use<TCaller>(TCaller caller)
-            where TCaller : ISecurePooledObjectUser
+        /// <summary>
+        /// Returns the recyclable value if it hasn't been reclaimed already.
+        /// </summary>
+        /// <typeparam name="TCaller">The type of renter of the object.</typeparam>
+        /// <param name="caller">The renter of the object.</param>
+        /// <returns>The rented object.</returns>
+        /// <exception cref="ObjectDisposedException">Thrown if <paramref name="caller"/> is no longer the renter of the value.</exception>
+        internal T Use<TCaller>(ref TCaller caller)
+            where TCaller : struct, ISecurePooledObjectUser
         {
-            this.ThrowDisposedIfNotOwned(caller);
-            return new SecurePooledObjectUser(this);
+            if (!IsOwned(ref caller))
+                Requires.FailObjectDisposed(caller);
+            return _value;
         }
 
-        internal void ThrowDisposedIfNotOwned<TCaller>(TCaller caller)
-            where TCaller : ISecurePooledObjectUser
+        internal bool TryUse<TCaller>(ref TCaller caller, out T value)
+            where TCaller : struct, ISecurePooledObjectUser
         {
-            if (caller.PoolUserId != this.owner)
+            if (IsOwned(ref caller))
             {
-                throw new ObjectDisposedException(caller.GetType().FullName);
+                value = _value;
+                return true;
+            }
+            else
+            {
+                value = default(T);
+                return false;
             }
         }
 
-        internal struct SecurePooledObjectUser : IDisposable
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal bool IsOwned<TCaller>(ref TCaller caller)
+            where TCaller : struct, ISecurePooledObjectUser
         {
-            private readonly SecurePooledObject<T> value;
-
-            internal SecurePooledObjectUser(SecurePooledObject<T> value)
-            {
-                this.value = value;
-            }
-
-            internal T Value
-            {
-                get { return this.value.value; }
-            }
-
-            public void Dispose()
-            {
-            }
+            return caller.PoolUserId == _owner;
         }
     }
 }

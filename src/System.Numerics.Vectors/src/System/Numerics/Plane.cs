@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 
@@ -48,7 +47,7 @@ namespace System.Numerics
         /// <summary>
         /// Constructs a Plane from the given Vector4.
         /// </summary>
-        /// <param name="value">A vector whose first 3 elements descrip the normal vector, 
+        /// <param name="value">A vector whose first 3 elements describe the normal vector, 
         /// and whose W component defines the distance along that normal from the origin.</param>
         public Plane(Vector4 value)
         {

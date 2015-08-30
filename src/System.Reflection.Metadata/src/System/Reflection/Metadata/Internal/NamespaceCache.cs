@@ -10,16 +10,17 @@ namespace System.Reflection.Metadata.Ecma335
 {
     internal class NamespaceCache
     {
-        private readonly MetadataReader metadataReader;
-        private readonly object namespaceTableAndListLock = new object();
-        private Dictionary<NamespaceDefinitionHandle, NamespaceData> namespaceTable;
-        private NamespaceData rootNamespace;
-        private ImmutableArray<NamespaceDefinitionHandle> namespaceList;
+        private readonly MetadataReader _metadataReader;
+        private readonly object _namespaceTableAndListLock = new object();
+        private Dictionary<NamespaceDefinitionHandle, NamespaceData> _namespaceTable;
+        private NamespaceData _rootNamespace;
+        private ImmutableArray<NamespaceDefinitionHandle> _namespaceList;
+        private uint _virtualNamespaceCounter;
 
         internal NamespaceCache(MetadataReader reader)
         {
             Debug.Assert(reader != null);
-            this.metadataReader = reader;
+            _metadataReader = reader;
         }
 
         /// <summary>
@@ -28,7 +29,7 @@ namespace System.Reflection.Metadata.Ecma335
         /// </summary>
         internal bool CacheIsRealized
         {
-            get { return this.namespaceTable != null; }
+            get { return _namespaceTable != null; }
         }
 
         internal string GetFullName(NamespaceDefinitionHandle handle)
@@ -41,26 +42,19 @@ namespace System.Reflection.Metadata.Ecma335
         internal NamespaceData GetRootNamespace()
         {
             EnsureNamespaceTableIsPopulated();
-            Debug.Assert(rootNamespace != null);
-            return rootNamespace;
+            Debug.Assert(_rootNamespace != null);
+            return _rootNamespace;
         }
 
         internal NamespaceData GetNamespaceData(NamespaceDefinitionHandle handle)
         {
             EnsureNamespaceTableIsPopulated();
             NamespaceData result;
-            if (!namespaceTable.TryGetValue(handle, out result))
+            if (!_namespaceTable.TryGetValue(handle, out result))
             {
-                ThrowInvalidHandle();
+                Throw.InvalidHandle();
             }
             return result;
-        }
-
-        // TODO: move throw helpers to common place. 
-        [MethodImplAttribute(MethodImplOptions.NoInlining)]
-        private static void ThrowInvalidHandle()
-        {
-            throw new BadImageFormatException(MetadataResources.InvalidHandle);
         }
 
         /// <summary>
@@ -83,11 +77,11 @@ namespace System.Reflection.Metadata.Ecma335
             StringHandle handleContainingSegment = fullNamespaceHandle.GetFullName();
             Debug.Assert(!handleContainingSegment.IsVirtual);
 
-            int lastFoundIndex = fullNamespaceHandle.Index - 1;
+            int lastFoundIndex = fullNamespaceHandle.GetHeapOffset() - 1;
             int currentSegment = 0;
             while (currentSegment < segmentIndex)
             {
-                int currentIndex = this.metadataReader.StringStream.IndexOfRaw(lastFoundIndex + 1, '.');
+                int currentIndex = _metadataReader.StringStream.IndexOfRaw(lastFoundIndex + 1, '.');
                 if (currentIndex == -1)
                 {
                     break;
@@ -100,8 +94,8 @@ namespace System.Reflection.Metadata.Ecma335
 
             // + 1 because lastFoundIndex will either "point" to a '.', or will be -1. Either way,
             // we want the next char.
-            uint resultIndex = (uint)(lastFoundIndex + 1);
-            return StringHandle.FromIndex(resultIndex).WithDotTermination();
+            int resultIndex = lastFoundIndex + 1;
+            return StringHandle.FromOffset(resultIndex).WithDotTermination();
         }
 
         /// <summary>
@@ -110,9 +104,9 @@ namespace System.Reflection.Metadata.Ecma335
         /// </summary>
         private void PopulateNamespaceTable()
         {
-            lock (namespaceTableAndListLock)
+            lock (_namespaceTableAndListLock)
             {
-                if (this.namespaceTable != null)
+                if (_namespaceTable != null)
                 {
                     return;
                 }
@@ -121,12 +115,12 @@ namespace System.Reflection.Metadata.Ecma335
 
                 // Make sure to add entry for root namespace. The root namespace is special in that even
                 // though it might not have types of its own it always has an equivalent representation
-                // as a nil handle and we don't want to handle it below as dot-terminated synthetic namespace.
+                // as a nil handle and we don't want to handle it below as dot-terminated virtual namespace.
                 // We use NamespaceDefinitionHandle.FromIndexOfFullName(0) instead of default(NamespaceDefinitionHandle) so
                 // that we never hand back a handle to the user that doesn't have a typeid as that prevents
                 // round-trip conversion to Handle and back. (We may discover other handle aliases for the
                 // root namespace (any nil/empty string will do), but we need this one to always be there.
-                NamespaceDefinitionHandle rootNamespace = NamespaceDefinitionHandle.FromIndexOfFullName(0);
+                NamespaceDefinitionHandle rootNamespace = NamespaceDefinitionHandle.FromFullNameOffset(0);
                 namespaceBuilderTable.Add(
                     rootNamespace,
                     new NamespaceDataBuilder(
@@ -140,8 +134,8 @@ namespace System.Reflection.Metadata.Ecma335
                 Dictionary<string, NamespaceDataBuilder> stringTable;
                 MergeDuplicateNamespaces(namespaceBuilderTable, out stringTable);
 
-                List<NamespaceDataBuilder> syntheticNamespaces;
-                ResolveParentChildRelationships(stringTable, out syntheticNamespaces);
+                List<NamespaceDataBuilder> virtualNamespaces;
+                ResolveParentChildRelationships(stringTable, out virtualNamespaces);
 
                 var namespaceTable = new Dictionary<NamespaceDefinitionHandle, NamespaceData>();
 
@@ -152,16 +146,16 @@ namespace System.Reflection.Metadata.Ecma335
                     namespaceTable.Add(group.Key, group.Value.Freeze());
                 }
 
-                if (syntheticNamespaces != null)
+                if (virtualNamespaces != null)
                 {
-                    foreach (var syntheticNamespace in syntheticNamespaces)
+                    foreach (var virtualNamespace in virtualNamespaces)
                     {
-                        namespaceTable.Add(syntheticNamespace.Handle, syntheticNamespace.Freeze());
+                        namespaceTable.Add(virtualNamespace.Handle, virtualNamespace.Freeze());
                     }
                 }
 
-                this.namespaceTable = namespaceTable;
-                this.rootNamespace = namespaceTable[rootNamespace];
+                _namespaceTable = namespaceTable;
+                _rootNamespace = namespaceTable[rootNamespace];
             }
         }
 
@@ -226,7 +220,7 @@ namespace System.Reflection.Metadata.Ecma335
             }
 
             StringHandle simpleName = GetSimpleName(realChild, numberOfSegments);
-            var namespaceHandle = NamespaceDefinitionHandle.FromIndexOfSimpleName((uint)simpleName.Index);
+            var namespaceHandle = NamespaceDefinitionHandle.FromVirtualIndex(++_virtualNamespaceCounter);
             return new NamespaceDataBuilder(namespaceHandle, simpleName, fullName);
         }
 
@@ -243,11 +237,11 @@ namespace System.Reflection.Metadata.Ecma335
 
         /// <summary>
         /// Links a child to its parent namespace. If the parent namespace doesn't exist, this will create a
-        /// synthetic one. This will automatically link any synthetic namespaces it creates up to its parents.
+        /// virtual one. This will automatically link any virtual namespaces it creates up to its parents.
         /// </summary>
         private void LinkChildToParentNamespace(Dictionary<string, NamespaceDataBuilder> existingNamespaces,
             NamespaceDataBuilder realChild,
-            ref List<NamespaceDataBuilder> syntheticNamespaces)
+            ref List<NamespaceDataBuilder> virtualNamespaces)
         {
             Debug.Assert(realChild.Handle.HasFullName);
             string childName = realChild.FullName;
@@ -284,9 +278,9 @@ namespace System.Reflection.Metadata.Ecma335
                     return;
                 }
 
-                if (syntheticNamespaces != null)
+                if (virtualNamespaces != null)
                 {
-                    foreach (var data in syntheticNamespaces)
+                    foreach (var data in virtualNamespaces)
                     {
                         if (data.FullName == parentName)
                         {
@@ -297,14 +291,14 @@ namespace System.Reflection.Metadata.Ecma335
                 }
                 else
                 {
-                    syntheticNamespaces = new List<NamespaceDataBuilder>();
+                    virtualNamespaces = new List<NamespaceDataBuilder>();
                 }
 
-                var syntheticParent = SynthesizeNamespaceData(parentName, realChild.Handle);
-                LinkChildDataToParentData(child, syntheticParent);
-                syntheticNamespaces.Add(syntheticParent);
-                childName = syntheticParent.FullName;
-                child = syntheticParent;
+                var virtualParent = SynthesizeNamespaceData(parentName, realChild.Handle);
+                LinkChildDataToParentData(child, virtualParent);
+                virtualNamespaces.Add(virtualParent);
+                childName = virtualParent.FullName;
+                child = virtualParent;
             }
         }
 
@@ -312,15 +306,15 @@ namespace System.Reflection.Metadata.Ecma335
         /// This will link all parents/children in the given namespaces dictionary up to each other.
         /// 
         /// In some cases, we need to synthesize namespaces that do not have any type definitions or forwarders
-        /// of their own, but do have child namespaces. These are returned via the syntheticNamespaces out
+        /// of their own, but do have child namespaces. These are returned via the virtualNamespaces out
         /// parameter.
         /// </summary>
-        private void ResolveParentChildRelationships(Dictionary<string, NamespaceDataBuilder> namespaces, out List<NamespaceDataBuilder> syntheticNamespaces)
+        private void ResolveParentChildRelationships(Dictionary<string, NamespaceDataBuilder> namespaces, out List<NamespaceDataBuilder> virtualNamespaces)
         {
-            syntheticNamespaces = null;
+            virtualNamespaces = null;
             foreach (var namespaceData in namespaces.Values)
             {
-                LinkChildToParentNamespace(namespaces, namespaceData, ref syntheticNamespaces);
+                LinkChildToParentNamespace(namespaces, namespaceData, ref virtualNamespaces);
             }
         }
 
@@ -331,15 +325,15 @@ namespace System.Reflection.Metadata.Ecma335
         {
             Debug.Assert(table != null);
 
-            foreach (var typeHandle in this.metadataReader.TypeDefinitions)
+            foreach (var typeHandle in _metadataReader.TypeDefinitions)
             {
-                TypeDefinition type = this.metadataReader.GetTypeDefinition(typeHandle);
+                TypeDefinition type = _metadataReader.GetTypeDefinition(typeHandle);
                 if (type.Attributes.IsNested())
                 {
                     continue;
                 }
 
-                NamespaceDefinitionHandle namespaceHandle = this.metadataReader.TypeDefTable.GetNamespace(typeHandle);
+                NamespaceDefinitionHandle namespaceHandle = _metadataReader.TypeDefTable.GetNamespaceDefinition(typeHandle);
                 NamespaceDataBuilder builder;
                 if (table.TryGetValue(namespaceHandle, out builder))
                 {
@@ -348,7 +342,7 @@ namespace System.Reflection.Metadata.Ecma335
                 else
                 {
                     StringHandle name = GetSimpleName(namespaceHandle);
-                    string fullName = this.metadataReader.GetString(namespaceHandle);
+                    string fullName = _metadataReader.GetString(namespaceHandle);
                     var newData = new NamespaceDataBuilder(namespaceHandle, name, fullName);
                     newData.TypeDefinitions.Add(typeHandle);
                     table.Add(namespaceHandle, newData);
@@ -363,15 +357,15 @@ namespace System.Reflection.Metadata.Ecma335
         {
             Debug.Assert(table != null);
 
-            foreach (var exportedTypeHandle in this.metadataReader.ExportedTypes)
+            foreach (var exportedTypeHandle in _metadataReader.ExportedTypes)
             {
-                ExportedType exportedType = this.metadataReader.GetExportedType(exportedTypeHandle);
+                ExportedType exportedType = _metadataReader.GetExportedType(exportedTypeHandle);
                 if (exportedType.Implementation.Kind == HandleKind.ExportedType)
                 {
                     continue; // skip nested exported types.
                 }
 
-                NamespaceDefinitionHandle namespaceHandle = exportedType.Namespace;
+                NamespaceDefinitionHandle namespaceHandle = exportedType.NamespaceDefinition;
                 NamespaceDataBuilder builder;
                 if (table.TryGetValue(namespaceHandle, out builder))
                 {
@@ -381,7 +375,7 @@ namespace System.Reflection.Metadata.Ecma335
                 {
                     Debug.Assert(namespaceHandle.HasFullName);
                     StringHandle simpleName = GetSimpleName(namespaceHandle);
-                    string fullName = this.metadataReader.GetString(namespaceHandle);
+                    string fullName = _metadataReader.GetString(namespaceHandle);
                     var newData = new NamespaceDataBuilder(namespaceHandle, simpleName, fullName);
                     newData.ExportedTypes.Add(exportedTypeHandle);
                     table.Add(namespaceHandle, newData);
@@ -394,18 +388,18 @@ namespace System.Reflection.Metadata.Ecma335
         /// </summary>
         private void PopulateNamespaceList()
         {
-            lock (namespaceTableAndListLock)
+            lock (_namespaceTableAndListLock)
             {
-                if (this.namespaceList != null)
+                if (_namespaceList != null)
                 {
                     return;
                 }
 
-                Debug.Assert(this.namespaceTable != null);
+                Debug.Assert(_namespaceTable != null);
                 var namespaceNameSet = new HashSet<string>();
                 var namespaceListBuilder = ImmutableArray.CreateBuilder<NamespaceDefinitionHandle>();
 
-                foreach (var group in namespaceTable)
+                foreach (var group in _namespaceTable)
                 {
                     var data = group.Value;
                     if (namespaceNameSet.Add(data.FullName))
@@ -414,7 +408,7 @@ namespace System.Reflection.Metadata.Ecma335
                     }
                 }
 
-                this.namespaceList = namespaceListBuilder.ToImmutable();
+                _namespaceList = namespaceListBuilder.ToImmutable();
             }
         }
 
@@ -424,11 +418,11 @@ namespace System.Reflection.Metadata.Ecma335
         private void EnsureNamespaceTableIsPopulated()
         {
             // PERF: Branch will rarely be taken; do work in PopulateNamespaceList() so this can be inlined easily.
-            if (this.namespaceTable == null)
+            if (_namespaceTable == null)
             {
                 PopulateNamespaceTable();
             }
-            Debug.Assert(this.namespaceTable != null);
+            Debug.Assert(_namespaceTable != null);
         }
 
         /// <summary>
@@ -436,11 +430,11 @@ namespace System.Reflection.Metadata.Ecma335
         /// </summary>
         private void EnsureNamespaceListIsPopulated()
         {
-            if (this.namespaceList == null)
+            if (_namespaceList == null)
             {
                 PopulateNamespaceList();
             }
-            Debug.Assert(this.namespaceList != null);
+            Debug.Assert(_namespaceList != null);
         }
 
         /// <summary>
@@ -463,7 +457,7 @@ namespace System.Reflection.Metadata.Ecma335
             public ImmutableArray<TypeDefinitionHandle>.Builder TypeDefinitions;
             public ImmutableArray<ExportedTypeHandle>.Builder ExportedTypes;
 
-            private NamespaceData frozen;
+            private NamespaceData _frozen;
 
             public NamespaceDataBuilder(NamespaceDefinitionHandle handle, StringHandle name, string fullName)
             {
@@ -484,7 +478,7 @@ namespace System.Reflection.Metadata.Ecma335
             {
                 // It is not an error to call this function multiple times. We cache the result
                 // because it's immutable.
-                if (frozen == null)
+                if (_frozen == null)
                 {
                     var namespaces = Namespaces.ToImmutable();
                     Namespaces = null;
@@ -495,10 +489,10 @@ namespace System.Reflection.Metadata.Ecma335
                     var exportedTypes = ExportedTypes.ToImmutable();
                     ExportedTypes = null;
 
-                    frozen = new NamespaceData(Name, FullName, Parent, namespaces, typeDefinitions, exportedTypes);
+                    _frozen = new NamespaceData(Name, FullName, Parent, namespaces, typeDefinitions, exportedTypes);
                 }
 
-                return frozen;
+                return _frozen;
             }
 
             public void MergeInto(NamespaceDataBuilder other)

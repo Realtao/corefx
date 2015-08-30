@@ -2,13 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Collections.Generic;
-using System.Diagnostics.Contracts;
 using Validation;
 
 namespace System.Collections.Immutable
 {
     /// <content>
-    /// Contains the inner MutationInput class.
+    /// Contains the inner <see cref="ImmutableHashSet{T}.MutationInput"/> class.
     /// </content>
     public partial class ImmutableHashSet<T>
     {
@@ -21,52 +20,52 @@ namespace System.Collections.Immutable
             /// <summary>
             /// The root of the data structure for the collection.
             /// </summary>
-            private readonly ImmutableSortedDictionary<int, HashBucket>.Node root;
+            private readonly SortedInt32KeyNode<HashBucket> _root;
 
             /// <summary>
             /// The equality comparer.
             /// </summary>
-            private readonly IEqualityComparer<T> equalityComparer;
+            private readonly IEqualityComparer<T> _equalityComparer;
 
             /// <summary>
             /// The current number of elements in the collection.
             /// </summary>
-            private readonly int count;
+            private readonly int _count;
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="ImmutableHashSet&lt;T&gt;.MutationInput"/> struct.
+            /// Initializes a new instance of the <see cref="ImmutableHashSet{T}.MutationInput"/> struct.
             /// </summary>
             /// <param name="set">The set.</param>
             internal MutationInput(ImmutableHashSet<T> set)
             {
                 Requires.NotNull(set, "set");
-                this.root = set.root;
-                this.equalityComparer = set.equalityComparer;
-                this.count = set.count;
+                _root = set._root;
+                _equalityComparer = set._equalityComparer;
+                _count = set._count;
             }
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="ImmutableHashSet&lt;T&gt;.MutationInput"/> struct.
+            /// Initializes a new instance of the <see cref="ImmutableHashSet{T}.MutationInput"/> struct.
             /// </summary>
             /// <param name="root">The root.</param>
             /// <param name="equalityComparer">The equality comparer.</param>
             /// <param name="count">The count.</param>
-            internal MutationInput(ImmutableSortedDictionary<int, HashBucket>.Node root, IEqualityComparer<T> equalityComparer, int count)
+            internal MutationInput(SortedInt32KeyNode<HashBucket> root, IEqualityComparer<T> equalityComparer, int count)
             {
                 Requires.NotNull(root, "root");
                 Requires.NotNull(equalityComparer, "equalityComparer");
                 Requires.Range(count >= 0, "count");
-                this.root = root;
-                this.equalityComparer = equalityComparer;
-                this.count = count;
+                _root = root;
+                _equalityComparer = equalityComparer;
+                _count = count;
             }
 
             /// <summary>
             /// Gets the root of the data structure for the collection.
             /// </summary>
-            internal ImmutableSortedDictionary<int, HashBucket>.Node Root
+            internal SortedInt32KeyNode<HashBucket> Root
             {
-                get { return this.root; }
+                get { return _root; }
             }
 
             /// <summary>
@@ -74,7 +73,7 @@ namespace System.Collections.Immutable
             /// </summary>
             internal IEqualityComparer<T> EqualityComparer
             {
-                get { return this.equalityComparer; }
+                get { return _equalityComparer; }
             }
 
             /// <summary>
@@ -82,7 +81,7 @@ namespace System.Collections.Immutable
             /// </summary>
             internal int Count
             {
-                get { return this.count; }
+                get { return _count; }
             }
         }
     }
