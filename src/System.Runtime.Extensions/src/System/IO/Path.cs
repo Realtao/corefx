@@ -69,9 +69,9 @@ namespace System.IO
             if (path != null)
             {
                 PathInternal.CheckInvalidPathChars(path);
-                path = NormalizePath(path, fullCheck: false);
-
+                path = PathInternal.NormalizeDirectorySeparators(path);
                 int root = PathInternal.GetRootLength(path);
+
                 int i = path.Length;
                 if (i > root)
                 {
@@ -122,27 +122,6 @@ namespace System.IO
             return string.Empty;
         }
 
-        private static string GetFullPathInternal(string path)
-        {
-            if (path == null)
-                throw new ArgumentNullException("path");
-            Contract.EndContractBlock();
-
-            return NormalizePath(path, fullCheck: true);
-        }
-
-        [System.Security.SecuritySafeCritical]  // auto-generated
-        private static string NormalizePath(string path, bool fullCheck)
-        {
-            return NormalizePath(path, fullCheck, MaxLongPath, expandShortPaths: true);
-        }
-
-        [System.Security.SecuritySafeCritical]  // auto-generated
-        private static string NormalizePath(string path, bool fullCheck, bool expandShortPaths)
-        {
-            return NormalizePath(path, fullCheck, MaxLongPath, expandShortPaths);
-        }
-        
         // Returns the name and extension parts of the given path. The resulting
         // string contains the characters of path that follow the last
         // separator in path. The resulting string is null if path is null.
@@ -175,22 +154,6 @@ namespace System.IO
             return (i = path.LastIndexOf('.')) == -1 ?
                 path : // No path extension found
                 path.Substring(0, i);
-        }
-
-        // Returns the root portion of the given path. The resulting string
-        // consists of those rightmost characters of the path that constitute the
-        // root of the path. Possible patterns for the resulting string are: An
-        // empty string (a relative path on the current drive), "\" (an absolute
-        // path on the current drive), "X:" (a relative path on a given drive,
-        // where X is the drive letter), "X:\" (an absolute path on a given drive),
-        // and "\\server\share" (a UNC path for a given server and share name).
-        // The resulting string is null if path is null.
-        [Pure]
-        public static string GetPathRoot(string path)
-        {
-            if (path == null) return null;
-            path = NormalizePath(path, fullCheck: false);
-            return path.Substring(0, PathInternal.GetRootLength(path));
         }
 
         // Returns a cryptographically strong random 8.3 string that can be 

@@ -46,7 +46,7 @@ internal partial class Interop
             string acceptTypes,
             uint flags);
 
-        // NOTE: except for the return type, this refers to the same function as WinOpenRequest.
+        // NOTE: except for the return type, this refers to the same function as WinHttpOpenRequest.
         [DllImport(Interop.Libraries.WinHttp, EntryPoint = "WinHttpOpenRequest", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern SafeWinHttpHandleWithCallback WinHttpOpenRequestWithCallback(
             SafeWinHttpHandle connectHandle,
@@ -61,7 +61,7 @@ internal partial class Interop
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool WinHttpAddRequestHeaders(
             SafeWinHttpHandle requestHandle,
-            StringBuilder headers,
+            [In] StringBuilder headers,
             uint headersLength,
             uint modifiers);
 
@@ -77,7 +77,7 @@ internal partial class Interop
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool WinHttpSendRequest(
             SafeWinHttpHandle requestHandle,
-            StringBuilder headers,
+            [In] StringBuilder headers,
             uint headersLength,
             IntPtr optional,
             uint optionalLength,
@@ -98,6 +98,12 @@ internal partial class Interop
 
         [DllImport(Interop.Libraries.WinHttp, CharSet = CharSet.Unicode, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool WinHttpQueryDataAvailable(
+            SafeWinHttpHandle requestHandle,
+            IntPtr parameterIgnoredAndShouldBeNullForAsync);
+
+        [DllImport(Interop.Libraries.WinHttp, CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool WinHttpReadData(
             SafeWinHttpHandle requestHandle,
             IntPtr buffer,
@@ -106,13 +112,31 @@ internal partial class Interop
 
         [DllImport(Interop.Libraries.WinHttp, CharSet = CharSet.Unicode, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool WinHttpReadData(
+            SafeWinHttpHandle requestHandle,
+            IntPtr buffer,
+            uint bufferSize,
+            IntPtr parameterIgnoredAndShouldBeNullForAsync);
+
+        [DllImport(Interop.Libraries.WinHttp, CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool WinHttpQueryHeaders(
             SafeWinHttpHandle requestHandle,
             uint infoLevel,
             string name,
-            StringBuilder buffer,
+            [Out] StringBuilder buffer,
             ref uint bufferLength,
             IntPtr index);
+
+        [DllImport(Interop.Libraries.WinHttp, CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool WinHttpQueryHeaders(
+            SafeWinHttpHandle requestHandle,
+            uint infoLevel,
+            string name,
+            [Out] StringBuilder buffer,
+            ref uint bufferLength,
+            ref uint index);
 
         [DllImport(Interop.Libraries.WinHttp, CharSet = CharSet.Unicode, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -129,7 +153,7 @@ internal partial class Interop
         public static extern bool WinHttpQueryOption(
             SafeWinHttpHandle handle,
             uint option,
-            StringBuilder buffer,
+            [Out] StringBuilder buffer,
             ref uint bufferSize);
 
         [DllImport(Interop.Libraries.WinHttp, CharSet = CharSet.Unicode, SetLastError = true)]
@@ -155,6 +179,14 @@ internal partial class Interop
             IntPtr buffer,
             uint bufferSize,
             out uint bytesWritten);
+
+        [DllImport(Interop.Libraries.WinHttp, CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool WinHttpWriteData(
+            SafeWinHttpHandle requestHandle,
+            IntPtr buffer,
+            uint bufferSize,
+            IntPtr parameterIgnoredAndShouldBeNullForAsync);
 
         [DllImport(Interop.Libraries.WinHttp, CharSet = CharSet.Unicode, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

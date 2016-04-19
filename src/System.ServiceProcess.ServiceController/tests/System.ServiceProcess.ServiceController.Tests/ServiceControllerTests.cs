@@ -1,15 +1,12 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Diagnostics;
-using System.IO;
-using System.ServiceProcess;
-using System.Threading;
-using Xunit;
 using Microsoft.Win32;
+using System.Diagnostics;
+using System.Security.Principal;
+using Xunit;
 
-namespace System.ServiceProcessServiceController.Tests
+namespace System.ServiceProcess.Tests
 {
     internal sealed class ServiceProvider
     {
@@ -79,7 +76,15 @@ namespace System.ServiceProcessServiceController.Tests
             _testService = new ServiceProvider();
         }
 
-        [Fact]
+        private static bool RunningWithElevatedPrivileges
+        {
+            get
+            {
+                return new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+            }
+        }
+
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void ConstructWithServiceName()
         {
             var controller = new ServiceController(_testService.TestServiceName);
@@ -89,7 +94,7 @@ namespace System.ServiceProcessServiceController.Tests
             Assert.Equal(ServiceType.Win32OwnProcess, controller.ServiceType);
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void ConstructWithDisplayName()
         {
             var controller = new ServiceController(_testService.TestServiceDisplayName);
@@ -99,7 +104,7 @@ namespace System.ServiceProcessServiceController.Tests
             Assert.Equal(ServiceType.Win32OwnProcess, controller.ServiceType);
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void ConstructWithMachineName()
         {
             var controller = new ServiceController(_testService.TestServiceName, _testService.TestMachineName);
@@ -111,7 +116,7 @@ namespace System.ServiceProcessServiceController.Tests
             Assert.Throws<ArgumentException>(() => { var c = new ServiceController(_testService.TestServiceName, ""); });
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void ControlCapabilities()
         {
             var controller = new ServiceController(_testService.TestServiceName);
@@ -120,7 +125,7 @@ namespace System.ServiceProcessServiceController.Tests
             Assert.False(controller.CanShutdown);
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void StartWithArguments()
         {
             var controller = new ServiceController(_testService.TestServiceName);
@@ -141,7 +146,7 @@ namespace System.ServiceProcessServiceController.Tests
             Assert.Equal(string.Join(",", args), argsString);
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void StopAndStart()
         {
             var controller = new ServiceController(_testService.TestServiceName);
@@ -159,7 +164,7 @@ namespace System.ServiceProcessServiceController.Tests
             }
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void PauseAndContinue()
         {
             var controller = new ServiceController(_testService.TestServiceName);
@@ -177,14 +182,14 @@ namespace System.ServiceProcessServiceController.Tests
             }
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void WaitForStatusTimeout()
         {
             var controller = new ServiceController(_testService.TestServiceName);
             Assert.Throws<System.ServiceProcess.TimeoutException>(() => controller.WaitForStatus(ServiceControllerStatus.Paused, TimeSpan.Zero));
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void GetServices()
         {
             bool foundTestService = false;
@@ -200,7 +205,7 @@ namespace System.ServiceProcessServiceController.Tests
             Assert.True(foundTestService, "Test service was not enumerated with all services");
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void GetDevices()
         {
             var devices = ServiceController.GetDevices();
@@ -211,16 +216,10 @@ namespace System.ServiceProcessServiceController.Tests
                 ServiceType.KernelDriver |
                 ServiceType.RecognizerDriver;
 
-            foreach (var device in devices)
-            {
-                if ((int)(device.ServiceType & SERVICE_TYPE_DRIVER) == 0)
-                {
-                    Assert.True(false, string.Format("Service '{0}' is of type '{1}' and is not a device driver.", device.ServiceName, device.ServiceType));
-                }
-            }
+            Assert.All(devices, device => Assert.NotEqual(0, (int)(device.ServiceType & SERVICE_TYPE_DRIVER)));
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void Dependencies()
         {
             // The test service creates a number of dependent services, each of which is depended on
@@ -254,7 +253,7 @@ namespace System.ServiceProcessServiceController.Tests
             }
         }
 
-        [Fact]
+        [ConditionalFact("RunningWithElevatedPrivileges")]
         public void ServicesStartMode()
         {
             var controller = new ServiceController(_testService.TestServiceName);
@@ -275,10 +274,7 @@ namespace System.ServiceProcessServiceController.Tests
         private static ServiceController AssertHasDependent(ServiceController controller, string serviceName, string displayName)
         {
             var dependent = FindService(controller.DependentServices, serviceName, displayName);
-            if (dependent == null)
-            {
-                Assert.True(false, string.Format("Expected service {0} to have dependent service {1}", controller.ServiceName, serviceName));
-            }
+            Assert.NotNull(dependent);
 
             return dependent;
         }
@@ -286,10 +282,7 @@ namespace System.ServiceProcessServiceController.Tests
         private static ServiceController AssertDependsOn(ServiceController controller, string serviceName, string displayName)
         {
             var dependency = FindService(controller.ServicesDependedOn, serviceName, displayName);
-            if (dependency == null)
-            {
-                Assert.True(false, string.Format("Expected service {0} to depend on service {1}", controller.ServiceName, serviceName));
-            }
+            Assert.NotNull(dependency);
 
             return dependency;
         }

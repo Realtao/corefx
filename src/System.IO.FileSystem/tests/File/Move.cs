@@ -3,7 +3,7 @@
 
 using Xunit;
 
-namespace System.IO.FileSystem.Tests
+namespace System.IO.Tests
 {
     public class File_Move : FileSystemTest
     {
@@ -154,7 +154,7 @@ namespace System.IO.FileSystem.Tests
             File.Create(testFileSource).Dispose();
             Assert.True(File.Exists(testFileSource), "test file should exist");
 
-            Assert.All(IOInputs.GetPathsLongerThanMaxPath(), (path) =>
+            Assert.All(IOInputs.GetPathsLongerThanMaxPath(GetTestFilePath()), (path) =>
             {
                 string baseDestinationPath = Path.GetDirectoryName(path);
                 if (!Directory.Exists(baseDestinationPath))
@@ -180,7 +180,7 @@ namespace System.IO.FileSystem.Tests
             string testFileSource = Path.Combine(TestDirectory, GetTestFileName());
             File.Create(testFileSource).Dispose();
 
-            Assert.All(IOInputs.GetPathsLongerThanMaxLongPath(), (path) =>
+            Assert.All(IOInputs.GetPathsLongerThanMaxLongPath(GetTestFilePath()), (path) =>
             {
                 Assert.Throws<PathTooLongException>(() => Move(testFileSource, path));
                 File.Delete(testFileSource);
@@ -191,6 +191,18 @@ namespace System.IO.FileSystem.Tests
         #endregion
 
         #region PlatformSpecific
+
+        [Fact]
+        [PlatformSpecific(PlatformID.Windows)]
+        public void WindowsPathWithIllegalColons()
+        {
+            FileInfo testFile = new FileInfo(GetTestFilePath());
+            testFile.Create().Dispose();
+            Assert.All(IOInputs.GetPathsWithInvalidColons(), (invalid) =>
+            {
+                Assert.Throws<NotSupportedException>(() => Move(testFile.FullName, invalid));
+            });
+        }
 
         [Fact]
         [PlatformSpecific(PlatformID.Windows)]

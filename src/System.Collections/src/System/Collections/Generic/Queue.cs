@@ -101,17 +101,21 @@ namespace System.Collections.Generic
         /// <include file='doc\Queue.uex' path='docs/doc[@for="Queue.Clear"]/*' />
         public void Clear()
         {
-            if (_head < _tail)
-                Array.Clear(_array, _head, _size);
-            else
+            if (_size != 0)
             {
-                Array.Clear(_array, _head, _array.Length - _head);
-                Array.Clear(_array, 0, _tail);
+                if (_head < _tail)
+                    Array.Clear(_array, _head, _size);
+                else
+                {
+                    Array.Clear(_array, _head, _array.Length - _head);
+                    Array.Clear(_array, 0, _tail);
+                }
+
+                _size = 0;
             }
 
             _head = 0;
             _tail = 0;
-            _size = 0;
             _version++;
         }
 
@@ -433,17 +437,7 @@ namespace System.Collections.Generic
 
             Object System.Collections.IEnumerator.Current
             {
-                get
-                {
-                    if (_index < 0)
-                    {
-                        if (_index == -1)
-                            throw new InvalidOperationException(SR.InvalidOperation_EnumNotStarted);
-                        else
-                            throw new InvalidOperationException(SR.InvalidOperation_EnumEnded);
-                    }
-                    return _currentElement;
-                }
+                get { return Current; }
             }
 
             void System.Collections.IEnumerator.Reset()

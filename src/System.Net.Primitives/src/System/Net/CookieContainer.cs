@@ -226,7 +226,7 @@ namespace System.Net
             }
 
             Uri uri;
-            StringBuilder uriSb = new StringBuilder();
+            var uriSb = new StringBuilder();
 
             // We cannot add an invalid cookie into the container.
             // Trying to prepare Uri for the cookie verification.
@@ -403,7 +403,7 @@ namespace System.Net
             }
             lock (_domainTable)
             {
-                foreach (KeyValuePair<string,PathList> entry in _domainTable)
+                foreach (KeyValuePair<string, PathList> entry in _domainTable)
                 {
                     if (domain == null)
                     {

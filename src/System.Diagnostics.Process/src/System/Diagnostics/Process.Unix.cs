@@ -36,7 +36,7 @@ namespace System.Diagnostics
         public void Kill()
         {
             EnsureState(State.HaveId);
-            int errno = Interop.libc.kill(_processId, Interop.libc.Signals.SIGKILL);
+            int errno = Interop.Sys.Kill(_processId, Interop.Sys.Signals.SIGKILL);
             if (errno != 0)
             {
                 throw new Win32Exception(errno); // same exception as on Windows
@@ -132,7 +132,7 @@ namespace System.Diagnostics
                 EnsureState(State.HaveId);
 
                 int pri = 0;
-                int errno = Interop.libc.getpriority(Interop.libc.PriorityWhich.PRIO_PROCESS, _processId, out pri);
+                int errno = Interop.Sys.GetPriority(Interop.Sys.PriorityWhich.PRIO_PROCESS, _processId, out pri);
                 if (errno != 0)
                 {
                     throw new Win32Exception(errno); // match Windows exception
@@ -161,7 +161,7 @@ namespace System.Diagnostics
                     default: throw new Win32Exception(); // match Windows exception
                 }
 
-                int result = Interop.libc.setpriority(Interop.libc.PriorityWhich.PRIO_PROCESS, _processId, pri);
+                int result = Interop.Sys.SetPriority(Interop.Sys.PriorityWhich.PRIO_PROCESS, _processId, pri);
                 if (result == -1)
                 {
                     throw new Win32Exception(); // match Windows exception
@@ -172,7 +172,7 @@ namespace System.Diagnostics
         /// <summary>Gets the ID of the current process.</summary>
         private static int GetCurrentProcessId()
         {
-            return Interop.libc.getpid();
+            return Interop.Sys.GetPid();
         }
 
         /// <summary>
@@ -198,11 +198,27 @@ namespace System.Diagnostics
         /// <param name="startInfo">The start info with which to start the process.</param>
         private bool StartCore(ProcessStartInfo startInfo)
         {
-            // Resolve the path to the specified file name
-            string filename = ResolvePath(startInfo.FileName);
+            string filename;
+            string[] argv;
 
-            // Parse argv, envp, and cwd out of the ProcessStartInfo
-            string[] argv = CreateArgv(startInfo);
+            if (startInfo.UseShellExecute)
+            {
+                if (startInfo.RedirectStandardInput || startInfo.RedirectStandardOutput || startInfo.RedirectStandardError)
+                {
+                    throw new InvalidOperationException(SR.CantRedirectStreams);
+                }
+
+                const string ShellPath = "/bin/sh";
+
+                filename = ShellPath;
+                argv = new string[3] { ShellPath, "-c", startInfo.FileName + " " + startInfo.Arguments};
+            }
+            else
+            {
+                filename = ResolvePath(startInfo.FileName);
+                argv = ParseArgv(startInfo);
+            }
+
             string[] envp = CreateEnvp(startInfo);
             string cwd = !string.IsNullOrWhiteSpace(startInfo.WorkingDirectory) ? startInfo.WorkingDirectory : null;
 
@@ -230,8 +246,8 @@ namespace System.Diagnostics
             if (startInfo.RedirectStandardInput)
             {
                 Debug.Assert(stdinFd >= 0);
-                _standardInput = new StreamWriter(OpenStream(stdinFd, FileAccess.Write), 
-                    Encoding.UTF8, StreamBufferSize) { AutoFlush = true };
+                _standardInput = new StreamWriter(OpenStream(stdinFd, FileAccess.Write),
+                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), StreamBufferSize) { AutoFlush = true };
             }
             if (startInfo.RedirectStandardOutput)
             {
@@ -262,7 +278,7 @@ namespace System.Diagnostics
         /// <summary>Converts the filename and arguments information from a ProcessStartInfo into an argv array.</summary>
         /// <param name="psi">The ProcessStartInfo.</param>
         /// <returns>The argv array.</returns>
-        private static string[] CreateArgv(ProcessStartInfo psi)
+        private static string[] ParseArgv(ProcessStartInfo psi)
         {
             string argv0 = psi.FileName; // pass filename (instead of resolved path) as argv[0], to match what caller supplied
             if (string.IsNullOrEmpty(psi.Arguments))
@@ -362,7 +378,7 @@ namespace System.Diagnostics
         {
             // Look up the number of ticks per second in the system's configuration,
             // then use that to convert to a TimeSpan
-            int ticksPerSecond = Interop.libc.sysconf(Interop.libc.SysConfNames._SC_CLK_TCK);
+            long ticksPerSecond = Interop.Sys.SysConf(Interop.Sys.SysConfName._SC_CLK_TCK);
             if (ticksPerSecond <= 0)
             {
                 throw new Win32Exception();

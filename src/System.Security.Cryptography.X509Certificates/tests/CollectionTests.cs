@@ -600,28 +600,26 @@ namespace System.Security.Cryptography.X509Certificates.Tests
         }
 
         [Fact]
-        [ActiveIssue(1993, PlatformID.AnyUnix)]
         public static void ExportCert()
         {
             TestExportSingleCert(X509ContentType.Cert);
         }
 
         [Fact]
-        [ActiveIssue(1993, PlatformID.AnyUnix)]
+        [PlatformSpecific(PlatformID.Windows)]
         public static void ExportSerializedCert()
         {
             TestExportSingleCert(X509ContentType.SerializedCert);
         }
 
         [Fact]
-        [ActiveIssue(1993, PlatformID.AnyUnix)]
+        [PlatformSpecific(PlatformID.Windows)]
         public static void ExportSerializedStore()
         {
             TestExportStore(X509ContentType.SerializedStore);
         }
 
         [Fact]
-        [ActiveIssue(1993, PlatformID.AnyUnix)]
         public static void ExportPkcs7()
         {
             TestExportStore(X509ContentType.Pkcs7);
@@ -655,6 +653,7 @@ namespace System.Security.Cryptography.X509Certificates.Tests
             Assert.NotNull(exported);
         }
 
+        [ActiveIssue(2893, PlatformID.OSX)]
         [Fact]
         public static void ExportUnrelatedPfx()
         {
@@ -677,28 +676,11 @@ namespace System.Security.Cryptography.X509Certificates.Tests
                 var importedCollection = new X509Certificate2Collection();
                 importedCollection.Import(exported);
 
-                // Verify that the two collections contain the same certificates,
-                // but the order isn't really a factor.
-                Assert.Equal(collection.Count, importedCollection.Count);
-
-                // Compare just the subject names first, because it's the easiest thing to read out of the failure message.
-                string[] subjects = new string[collection.Count];
-                string[] importedSubjects = new string[collection.Count];
-
-                for (int i = 0; i < collection.Count; i++)
-                {
-                    subjects[i] = collection[i].GetNameInfo(X509NameType.SimpleName, false);
-                    importedSubjects[i] = importedCollection[i].GetNameInfo(X509NameType.SimpleName, false);
-                }
-
-                Assert.Equal(subjects, importedSubjects);
-
-                // But, really, the collections should be equivalent
-                // (after being coerced to IEnumerable<X509Certificate2>)
-                Assert.Equal(collection.OfType<X509Certificate2>(), importedCollection.OfType<X509Certificate2>());
+                // TODO (#3207): Make this test be order-required once ordering is guaranteed on all platforms.
+                AssertEqualUnordered(collection, importedCollection);
             }
         }
-
+       
         [Fact]
         public static void MultipleImport()
         {
@@ -1185,6 +1167,39 @@ namespace System.Security.Cryptography.X509Certificates.Tests
                     Assert.NotSame(pfxCer, second);
                     Assert.Equal(pfxCer, second);
                 }
+            }
+        }
+
+        private static void AssertEqualUnordered(
+           X509Certificate2Collection collection,
+           X509Certificate2Collection importedCollection)
+        {
+            // Verify that the two collections contain the same certificates,
+            // but the order isn't really a factor.
+            Assert.Equal(collection.Count, importedCollection.Count);
+
+            // Compare just the subject names first, because it's the easiest thing to read out of the failure message.
+            string[] subjects = new string[collection.Count];
+            string[] importedSubjects = new string[collection.Count];
+            X509Certificate2[] importedCertificates = new X509Certificate2[collection.Count];
+
+            for (int i = 0; i < collection.Count; i++)
+            {
+                subjects[i] = collection[i].GetNameInfo(X509NameType.SimpleName, false);
+                importedSubjects[i] = importedCollection[i].GetNameInfo(X509NameType.SimpleName, false);
+                importedCertificates[i] = importedCollection[i];
+            }
+
+            // The best error message would come from a mis-matched subject
+            foreach (string subject in subjects)
+            {
+                Assert.Contains(subject, importedSubjects);
+            }
+
+            // But, really, the collections should be equivalent
+            foreach (X509Certificate2 expectedCert in collection)
+            {
+                Assert.Contains(expectedCert, importedCertificates);
             }
         }
 

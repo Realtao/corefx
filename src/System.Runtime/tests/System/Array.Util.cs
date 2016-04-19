@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections;
+
 using Xunit;
 
 public static class ArrayUtil
@@ -30,21 +31,11 @@ public static class ArrayUtil
 
         if (comparer != null)
         {
-            if (comparer.Compare(firstValue, secondValue) != 0)
-            {
-                Assert.True(false,
-                    string.Format("Elements at index [" + index + "] of the arrays were not equal. Expected {0}, actual {1}",
-                    firstValue, secondValue));
-            }
+            Assert.Equal(0, comparer.Compare(firstValue, secondValue));
         }
         else
         {
-            if (!Equals(firstValue, second.GetValue(index)))
-            {
-                Assert.True(false,
-                    string.Format("Elements at index [" + index + "] of the arrays were not equal. Expected {0}, actual {1}",
-                        firstValue, secondValue));
-            }
+            Assert.Equal(firstValue, secondValue);
         }
     }
 
@@ -76,8 +67,8 @@ public static class ArrayUtil
             bool swapped = false;
             for (int g = startingIndex; g < startingIndex + length - 1; g++)
             {
-                Object first = array.GetValue(g);
-                Object second = array.GetValue(g + 1);
+                object first = array.GetValue(g);
+                object second = array.GetValue(g + 1);
                 int comparison = comparer.Compare(first, second);
                 if (comparison == 1)
                 {
@@ -97,7 +88,7 @@ public static class ArrayUtil
 
     private static void Swap(int from, int to, Array array, Array items)
     {
-        Object temp = array.GetValue(from);
+        object temp = array.GetValue(from);
         array.SetValue(array.GetValue(to), from);
         array.SetValue(temp, to);
 

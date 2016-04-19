@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace System.Diagnostics.ProcessTests
+namespace System.Diagnostics.Tests
 {
     public class ProcessWaitingTests : ProcessTestBase
     {
@@ -13,7 +13,7 @@ namespace System.Diagnostics.ProcessTests
         public void MultipleProcesses_StartAllKillAllWaitAll()
         {
             const int Iters = 50;
-            Process[] processes = Enumerable.Range(0, Iters).Select(_ => CreateProcessInfinite()).ToArray();
+            Process[] processes = Enumerable.Range(0, Iters).Select(_ => CreateProcessLong()).ToArray();
 
             foreach (Process p in processes) p.Start();
             foreach (Process p in processes) p.Kill();
@@ -26,7 +26,7 @@ namespace System.Diagnostics.ProcessTests
             const int Iters = 50;
             for (int i = 0; i < Iters; i++)
             {
-                Process p = CreateProcessInfinite();
+                Process p = CreateProcessLong();
                 p.Start();
                 p.Kill();
                 p.WaitForExit(WaitInMS);
@@ -41,7 +41,7 @@ namespace System.Diagnostics.ProcessTests
             {
                 for (int i = 0; i < ItersPerTask; i++)
                 {
-                    Process p = CreateProcessInfinite();
+                    Process p = CreateProcessLong();
                     p.Start();
                     p.Kill();
                     p.WaitForExit(WaitInMS);
@@ -61,7 +61,7 @@ namespace System.Diagnostics.ProcessTests
         [Fact]
         public void SingleProcess_TryWaitMultipleTimesBeforeCompleting()
         {
-            Process p = CreateProcessInfinite();
+            Process p = CreateProcessLong();
             p.Start();
 
             // Verify we can try to wait for the process to exit multiple times
@@ -83,7 +83,7 @@ namespace System.Diagnostics.ProcessTests
         [InlineData(true)]
         public async Task SingleProcess_WaitAfterExited(bool addHandlerBeforeStart)
         {
-            Process p = CreateProcessInfinite();
+            Process p = CreateProcessLong();
             p.EnableRaisingEvents = true;
 
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -106,7 +106,7 @@ namespace System.Diagnostics.ProcessTests
         [Fact]
         public void SingleProcess_CopiesShareExitInformation()
         {
-            Process p = CreateProcessInfinite();
+            Process p = CreateProcessLong();
             p.Start();
 
             Process[] copies = Enumerable.Range(0, 3).Select(_ => Process.GetProcessById(p.Id)).ToArray();
@@ -124,7 +124,7 @@ namespace System.Diagnostics.ProcessTests
         [Fact]
         public void WaitForPeerProcess()
         {
-            Process child1 = CreateProcessInfinite();
+            Process child1 = CreateProcessLong();
             child1.Start();
 
             Process child2 = CreateProcess(peerId =>
@@ -178,8 +178,7 @@ namespace System.Diagnostics.ProcessTests
             Process child = CreateProcess(() =>
             {
                 Process.GetCurrentProcess().Kill();
-                Assert.False(true, "Shouldn't get here");
-                return SuccessExitCode;
+                throw new ShouldNotBeInvokedException();
             });
             child.Start();
             Assert.True(child.WaitForExit(WaitInMS));

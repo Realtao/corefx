@@ -202,7 +202,7 @@ namespace System.Linq.Expressions.Compiler
             List<WriteBack> wb = EmitArguments(lambda.Type.GetMethod("Invoke"), invoke);
 
             // 2. Create the nested LambdaCompiler
-            var inner = new LambdaCompiler(this, lambda);
+            var inner = new LambdaCompiler(this, lambda, invoke);
 
             // 3. Emit the body
             // if the inlined lambda is the last expression of the whole lambda,
@@ -291,15 +291,23 @@ namespace System.Linq.Expressions.Compiler
                 var method = node.Indexer.GetGetMethod(true);
                 EmitCall(objectType, method);
             }
-            else if (node.Arguments.Count != 1)
+            else
+            {
+                EmitGetArrayElement(objectType);
+            }
+        }
+
+        private void EmitGetArrayElement(Type arrayType)
+        {
+            if (!arrayType.IsVector())
             {
                 // Multidimensional arrays, call get
-                _ilg.Emit(OpCodes.Call, node.Object.Type.GetMethod("Get", BindingFlags.Public | BindingFlags.Instance));
+                _ilg.Emit(OpCodes.Call, arrayType.GetMethod("Get", BindingFlags.Public | BindingFlags.Instance));
             }
             else
             {
                 // For one dimensional arrays, emit load
-                _ilg.EmitLoadElement(node.Type);
+                _ilg.EmitLoadElement(arrayType.GetElementType());
             }
         }
 
@@ -311,15 +319,23 @@ namespace System.Linq.Expressions.Compiler
                 var method = node.Indexer.GetSetMethod(true);
                 EmitCall(objectType, method);
             }
-            else if (node.Arguments.Count != 1)
+            else
+            {
+                EmitSetArrayElement(objectType);
+            }
+        }
+
+        private void EmitSetArrayElement(Type arrayType)
+        {
+            if (!arrayType.IsVector())
             {
                 // Multidimensional arrays, call set
-                _ilg.Emit(OpCodes.Call, node.Object.Type.GetMethod("Set", BindingFlags.Public | BindingFlags.Instance));
+                _ilg.Emit(OpCodes.Call, arrayType.GetMethod("Set", BindingFlags.Public | BindingFlags.Instance));
             }
             else
             {
                 // For one dimensional arrays, emit store
-                _ilg.EmitStoreElement(node.Type);
+                _ilg.EmitStoreElement(arrayType.GetElementType());
             }
         }
 
@@ -581,6 +597,9 @@ namespace System.Linq.Expressions.Compiler
 
             if (node.Constructor != null)
             {
+                if (node.Constructor.DeclaringType.GetTypeInfo().IsAbstract)
+                    throw Error.NonAbstractConstructorRequired();
+
                 List<WriteBack> wb = EmitArguments(node.Constructor, node);
                 _ilg.Emit(OpCodes.Newobj, node.Constructor);
                 EmitWriteBack(wb);

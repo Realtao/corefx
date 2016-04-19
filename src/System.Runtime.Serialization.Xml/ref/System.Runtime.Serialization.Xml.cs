@@ -40,6 +40,11 @@ namespace System.Runtime.Serialization
         public override void WriteStartObject(System.Xml.XmlDictionaryWriter writer, object graph) { }
         public override void WriteStartObject(System.Xml.XmlWriter writer, object graph) { }
     }
+    public static partial class DataContractSerializerExtensions
+    {
+        public static System.Runtime.Serialization.ISerializationSurrogateProvider GetSerializationSurrogateProvider(this DataContractSerializer serializer) { return default(System.Runtime.Serialization.ISerializationSurrogateProvider); }
+        public static void SetSerializationSurrogateProvider(this DataContractSerializer serializer, System.Runtime.Serialization.ISerializationSurrogateProvider provider)  { }
+    }
     public partial class DataContractSerializerSettings
     {
         public DataContractSerializerSettings() { }

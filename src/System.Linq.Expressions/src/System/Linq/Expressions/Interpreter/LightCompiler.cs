@@ -11,7 +11,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-using AstUtils = System.Linq.Expressions.Interpreter.Utils;
+using AstUtils = System.Linq.Expressions.Utils;
 
 namespace System.Linq.Expressions.Interpreter
 {
@@ -1013,7 +1013,7 @@ namespace System.Linq.Expressions.Interpreter
                 Compile(node.Operand);
                 _instructions.EmitStoreLocal(opTemp.Index);
 
-                if (!node.Operand.Type.GetTypeInfo().IsValueType || 
+                if (!node.Operand.Type.GetTypeInfo().IsValueType ||
                     (TypeUtils.IsNullableType(node.Operand.Type) && node.IsLiftedToNull))
                 {
                     _instructions.EmitLoadLocal(opTemp.Index);
@@ -1023,7 +1023,7 @@ namespace System.Linq.Expressions.Interpreter
                 }
 
                 _instructions.EmitLoadLocal(opTemp.Index);
-                if(TypeUtils.IsNullableType(node.Operand.Type) &&
+                if (TypeUtils.IsNullableType(node.Operand.Type) &&
                     node.Method.GetParametersCached()[0].ParameterType.Equals(TypeUtils.GetNonNullableType(node.Operand.Type)))
                 {
                     _instructions.Emit(NullableMethodCallInstruction.CreateGetValue());
@@ -1187,6 +1187,17 @@ namespace System.Linq.Expressions.Interpreter
                         Compile(node.Operand);
                         _instructions.EmitDecrement(node.Type);
                         break;
+                    case ExpressionType.UnaryPlus:
+                        Compile(node.Operand);
+                        break;
+                    case ExpressionType.IsTrue:
+                    case ExpressionType.IsFalse:
+                        EmitUnaryBoolCheck(node);
+                        break;
+                    case ExpressionType.OnesComplement:
+                        Compile(node.Operand);
+                        _instructions.EmitOnesComplement(node.Type);
+                        break;
                     default:
                         throw new PlatformNotSupportedException(SR.Format(SR.UnsupportedExpressionType, node.NodeType));
                 }
@@ -1198,31 +1209,44 @@ namespace System.Linq.Expressions.Interpreter
             Compile(node.Operand);
             if (node.IsLifted)
             {
-                LocalDefinition temp = _locals.DefineLocal(
-                    Expression.Parameter(node.Operand.Type),
-                    _instructions.Count
-                );
                 var notNull = _instructions.MakeLabel();
                 var computed = _instructions.MakeLabel();
 
-                _instructions.EmitStoreLocal(temp.Index);
-                _instructions.EmitLoadLocal(temp.Index);
-                _instructions.EmitLoad(null, typeof(object));
-                _instructions.EmitEqual(typeof(object));
-                _instructions.EmitBranchFalse(notNull);
-
-                _instructions.EmitLoad(null, typeof(object));
+                _instructions.EmitCoalescingBranch(notNull);
                 _instructions.EmitBranch(computed);
 
                 _instructions.MarkLabel(notNull);
                 _instructions.EmitCall(node.Method);
 
                 _instructions.MarkLabel(computed);
-                _locals.UndefineLocal(temp, _instructions.Count);
             }
             else
             {
                 _instructions.EmitCall(node.Method);
+            }
+        }
+
+        private void EmitUnaryBoolCheck(UnaryExpression node)
+        {
+            Compile(node.Operand);
+            if (node.IsLifted)
+            {
+                var notNull = _instructions.MakeLabel();
+                var computed = _instructions.MakeLabel();
+
+                _instructions.EmitCoalescingBranch(notNull);
+                _instructions.EmitBranch(computed);
+
+                _instructions.MarkLabel(notNull);
+                _instructions.EmitLoad(node.NodeType == ExpressionType.IsTrue);
+                _instructions.EmitEqual(typeof(bool));
+
+                _instructions.MarkLabel(computed);
+            }
+            else
+            {
+                _instructions.EmitLoad(node.NodeType == ExpressionType.IsTrue);
+                _instructions.EmitEqual(typeof(bool));
             }
         }
 
@@ -1493,12 +1517,12 @@ namespace System.Linq.Expressions.Interpreter
             LocalDefinition temp = _locals.DefineLocal(Expression.Parameter(node.SwitchValue.Type), _instructions.Count);
             Compile(node.SwitchValue);
             _instructions.EmitStoreLocal(temp.Index);
-                        
+
             var doneLabel = Expression.Label(node.Type, "done");
 
-            foreach(var @case in node.Cases)
+            foreach (var @case in node.Cases)
             {
-                foreach(var val in @case.TestValues)
+                foreach (var val in @case.TestValues)
                 {
                     //  temp == val ? 
                     //          goto(Body) doneLabel: 
@@ -2118,13 +2142,6 @@ namespace System.Linq.Expressions.Interpreter
             }
             else
             {
-                if (!node.Method.IsStatic)
-                {
-                    // emit null check, our instructions don't always do this when they're
-                    // calling via a delegate.  
-                    _instructions.EmitNullCheck(node.Arguments.Count);
-                }
-
                 if (updaters == null)
                 {
                     _instructions.EmitCall(node.Method, parameters);
@@ -2233,7 +2250,11 @@ namespace System.Linq.Expressions.Interpreter
                     if (field != null)
                     {
                         _instructions.EmitLoadField(field);
-                        return new FieldByRefUpdater(memberTemp, field, index);
+                        if (!field.IsLiteral && !field.IsInitOnly)
+                        {
+                            return new FieldByRefUpdater(memberTemp, field, index);
+                        }
+                        return null;
                     }
                     PropertyInfo property = member.Member as PropertyInfo;
                     if (property != null)
@@ -2307,6 +2328,9 @@ namespace System.Linq.Expressions.Interpreter
 
             if (node.Constructor != null)
             {
+                if (node.Constructor.DeclaringType.GetTypeInfo().IsAbstract)
+                    throw Error.NonAbstractConstructorRequired();
+
                 var parameters = node.Constructor.GetParameters();
                 List<ByRefUpdater> updaters = null;
 
@@ -2381,7 +2405,6 @@ namespace System.Linq.Expressions.Interpreter
                     }
                     _instructions.EmitLoadField(fi);
                 }
-                return;
             }
             else
             {
@@ -2396,7 +2419,7 @@ namespace System.Linq.Expressions.Interpreter
                     }
 
                     if (!method.IsStatic &&
-                        from.Type.IsNullableType())
+                        (from != null && from.Type.IsNullableType()))
                     {
                         // reflection doesn't let us call methods on Nullable<T> when the value
                         // is null...  so we get to special case those methods!
@@ -2406,8 +2429,6 @@ namespace System.Linq.Expressions.Interpreter
                     {
                         _instructions.EmitCall(method);
                     }
-
-                    return;
                 }
             }
         }
@@ -2754,8 +2775,13 @@ namespace System.Linq.Expressions.Interpreter
         private void CompileUnboxUnaryExpression(Expression expr)
         {
             var node = (UnaryExpression)expr;
-            // unboxing is a nop:
+
             Compile(node.Operand);
+
+            if (expr.Type.GetTypeInfo().IsValueType && !TypeUtils.IsNullableType(expr.Type))
+            {
+                _instructions.Emit(NullCheckInstruction.Instance);
+            }
         }
 
         private void CompileTypeEqualExpression(Expression expr)
@@ -3094,7 +3120,16 @@ namespace System.Linq.Expressions.Interpreter
         public override void Update(InterpretedFrame frame, object value)
         {
             var obj = _object == null ? null : frame.Data[_object.Value.Index];
-            _property.SetValue(obj, value);
+
+            try
+            {
+                _property.SetValue(obj, value);
+            }
+            catch (TargetInvocationException e)
+            {
+                ExceptionHelpers.UpdateForRethrow(e.InnerException);
+                throw e.InnerException;
+            }
         }
 
         public override void UndefineTemps(InstructionList instructions, LocalVariables locals)
@@ -3128,10 +3163,18 @@ namespace System.Linq.Expressions.Interpreter
                 args[i] = frame.Data[_args[i].Index];
             }
             args[args.Length - 1] = value;
-            _indexer.Invoke(
-                _obj == null ? null : frame.Data[_obj.Value.Index],
-                args
-            );
+
+            object instance = _obj == null ? null : frame.Data[_obj.Value.Index];
+
+            try
+            {
+                _indexer.Invoke(instance, args);
+            }
+            catch (TargetInvocationException e)
+            {
+                ExceptionHelpers.UpdateForRethrow(e.InnerException);
+                throw e.InnerException;
+            }
         }
 
         public override void UndefineTemps(InstructionList instructions, LocalVariables locals)

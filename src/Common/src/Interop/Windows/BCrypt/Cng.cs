@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Runtime.InteropServices;
 
+using Internal.Cryptography;
+
 namespace Internal.NativeCrypto
 {
     internal static partial class BCryptNative
@@ -66,7 +68,11 @@ namespace Internal.NativeCrypto
             BCRYPT_ALG_HANDLE_HMAC_FLAG = 0x00000008,
         }
 
-        public const String BCRYPT_AES_ALGORITHM = "AES";
+        public const string BCRYPT_3DES_ALGORITHM = "3DES";
+        public const string BCRYPT_AES_ALGORITHM = "AES";
+
+        public const string BCRYPT_CHAIN_MODE_CBC = "ChainingModeCBC";
+        public const string BCRYPT_CHAIN_MODE_ECB = "ChainingModeECB";
 
         public static SafeAlgorithmHandle BCryptOpenAlgorithmProvider(String pszAlgId, String pszImplementation, OpenAlgorithmProviderFlags dwFlags)
         {
@@ -210,7 +216,7 @@ namespace Internal.NativeCrypto
         private static Exception CreateCryptographicException(NTSTATUS ntStatus)
         {
             int hr = ((int)ntStatus) | 0x01000000;
-            return new CryptographicException(hr);
+            return hr.ToCryptographicException();
         }
     }
 
@@ -244,7 +250,7 @@ namespace Internal.NativeCrypto
                 [In]      byte[] pbEncoded,         // Data to be formatted
                 [In]      int cbEncoded,            // Length of data to be formatted
                 [MarshalAs(UnmanagedType.LPWStr)]
-                [In, Out] StringBuilder pbFormat,   // Receives formatted string.
+                [Out]     StringBuilder pbFormat,   // Receives formatted string.
                 [In, Out] ref int pcbFormat);       // Sends/receives length of formatted String.
         }
     }

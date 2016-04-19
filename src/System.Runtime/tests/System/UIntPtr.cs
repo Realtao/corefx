@@ -2,8 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
-using System.Collections;
-using System.Collections.Generic;
+
 using Xunit;
 
 public static unsafe class UIntPtrTests
@@ -58,9 +57,9 @@ public static unsafe class UIntPtrTests
         p = new UIntPtr(42);
         b = p.Equals(null);
         Assert.False(b);
-        b = p.Equals((Object)42);
+        b = p.Equals((object)42);
         Assert.False(b);
-        b = p.Equals((Object)(new UIntPtr(42)));
+        b = p.Equals((object)(new UIntPtr(42)));
         Assert.True(b);
 
         int h = p.GetHashCode();
@@ -85,57 +84,35 @@ public static unsafe class UIntPtrTests
         Assert.Equal(p, p2);
 
         p = new UIntPtr(0x7fffffffffffffff);
-        try
-        {
-            i = (uint)p;
-            Assert.True(false, "Cast to uint should have thrown.");
-        }
-        catch (OverflowException)
-        {
-        }
+        Assert.Throws<OverflowException>(() => (uint)p);
     }
 
     private static void TestPointer(UIntPtr p, ulong expected)
     {
         ulong l = p.ToUInt64();
-        Assert.Equal(l, expected);
+        Assert.Equal(expected, l);
 
         uint expected32 = (uint)expected;
         if (expected32 != expected)
         {
-            try
-            {
-                uint i = p.ToUInt32();
-                Assert.True(false, "ToUInt32() should have thrown.");
-            }
-            catch (OverflowException)
-            {
-            }
+            Assert.Throws<OverflowException>(() => p.ToUInt32());
             return;
         }
 
         {
             uint i = p.ToUInt32();
-            Assert.Equal(i, expected32);
+            Assert.Equal(expected32, i);
         }
 
-        String s = p.ToString();
-        String sExpected = expected.ToString();
+        string s = p.ToString();
+        string sExpected = expected.ToString();
         Assert.Equal(s, sExpected);
 
-        bool b;
-
-        b = (p == new UIntPtr(expected));
-        Assert.True(b);
-
-        b = (p == new UIntPtr(expected + 1));
-        Assert.False(b);
-
-        b = (p != new UIntPtr(expected));
-        Assert.False(b);
-
-        b = (p != new UIntPtr(expected + 1));
-        Assert.True(b);
+        Assert.True(p == new UIntPtr(expected));
+        Assert.Equal(p, new UIntPtr(expected));
+        Assert.False(p == new UIntPtr(expected + 1));
+        Assert.NotEqual(p, new UIntPtr(expected + 1));
+        Assert.False(p != new UIntPtr(expected));
+        Assert.True(p != new UIntPtr(expected + 1));
     }
 }
-

@@ -1,48 +1,35 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Runtime.InteropServices;
-using System.Text;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
-using SafeCurlHandle = Interop.libcurl.SafeCurlHandle;
-using SafeCurlMultiHandle = Interop.libcurl.SafeCurlMultiHandle;
-using SafeCurlSlistHandle = Interop.libcurl.SafeCurlSlistHandle;
-using CURLoption = Interop.libcurl.CURLoption;
-using CURLMoption = Interop.libcurl.CURLMoption;
-using CURLcode = Interop.libcurl.CURLcode;
-using CURLMcode = Interop.libcurl.CURLMcode;
-using CURLINFO = Interop.libcurl.CURLINFO;
-using CURLAUTH = Interop.libcurl.CURLAUTH;
-using CurlVersionInfoData = Interop.libcurl.curl_version_info_data;
-using CurlFeatures = Interop.libcurl.CURL_VERSION_Features;
-using CURLProxyType = Interop.libcurl.curl_proxytype;
-using size_t = System.IntPtr;
-
+using CURLAUTH = Interop.Http.CURLAUTH;
+using CURLcode = Interop.Http.CURLcode;
+using CURLMcode = Interop.Http.CURLMcode;
+using CURLoption = Interop.Http.CURLoption;
 
 namespace System.Net.Http
-{  
+{
     internal partial class CurlHandler : HttpMessageHandler
     {
         #region Constants
+
+        private const string VerboseDebuggingConditional = "CURLHANDLER_VERBOSE";
+        private const char SpaceChar = ' ';
+        private const int StatusCodeLength = 3;
 
         private const string UriSchemeHttp = "http";
         private const string UriSchemeHttps = "https";
         private const string EncodingNameGzip = "gzip";
         private const string EncodingNameDeflate = "deflate";
-        private readonly static string[] AuthenticationSchemes = { "Negotiate", "Digest", "Basic" }; // the order in which libcurl goes over authentication schemes
-        private readonly static ulong[]  AuthSchemePriorityOrder = { CURLAUTH.Negotiate, CURLAUTH.Digest, CURLAUTH.Basic };
 
-        private const int s_requestBufferSize = 16384; // Default used by libcurl
+        private const int RequestBufferSize = 16384; // Default used by libcurl
         private const string NoTransferEncoding = HttpKnownHeaderNames.TransferEncoding + ":";
-        private readonly static CurlVersionInfoData curlVersionInfoData;
+        private const string NoContentType = HttpKnownHeaderNames.ContentType + ":";
         private const int CurlAge = 5;
         private const int MinCurlAge = 3;
 
@@ -50,50 +37,53 @@ namespace System.Net.Http
 
         #region Fields
 
-        private static readonly bool _supportsAutomaticDecompression;
-        private static readonly bool _supportsSSL;
+        private readonly static char[] s_newLineCharArray = new char[] { HttpRuleParser.CR, HttpRuleParser.LF };
+        private readonly static string[] s_authenticationSchemes = { "Negotiate", "Digest", "Basic" }; // the order in which libcurl goes over authentication schemes
+        private readonly static CURLAUTH[] s_authSchemePriorityOrder = { CURLAUTH.Negotiate, CURLAUTH.Digest, CURLAUTH.Basic };
+
+        private readonly static bool s_supportsAutomaticDecompression;
+        private readonly static bool s_supportsSSL;
+        private readonly static bool s_supportsHttp2Multiplexing;
+
+        private readonly MultiAgent _agent = new MultiAgent();
         private volatile bool _anyOperationStarted;
         private volatile bool _disposed;
+
         private IWebProxy _proxy = null;
         private ICredentials _serverCredentials = null;
         private ProxyUsePolicy _proxyPolicy = ProxyUsePolicy.UseDefaultProxy;
         private DecompressionMethods _automaticDecompression = HttpHandlerDefaults.DefaultAutomaticDecompression;
-        private SafeCurlMultiHandle _multiHandle;
-        private GCHandle _multiHandlePtr = new GCHandle();
-        private bool _preAuthenticate = false;
-        private CredentialCache _credentialCache = null;
-        private CookieContainer _cookieContainer = null;
-        private bool _useCookie = false;
+        private bool _preAuthenticate = HttpHandlerDefaults.DefaultPreAuthenticate;
+        private CredentialCache _credentialCache = null; // protected by LockObject
+        private CookieContainer _cookieContainer = new CookieContainer();
+        private bool _useCookie = HttpHandlerDefaults.DefaultUseCookies;
         private bool _automaticRedirection = HttpHandlerDefaults.DefaultAutomaticRedirection;
         private int _maxAutomaticRedirections = HttpHandlerDefaults.DefaultMaxAutomaticRedirections;
+        private ClientCertificateOption _clientCertificateOption = HttpHandlerDefaults.DefaultClientCertificateOption;
+
+        private object LockObject { get { return _agent; } }
 
         #endregion        
 
         static CurlHandler()
         {
-            int result = Interop.libcurl.curl_global_init(Interop.libcurl.CurlGlobalFlags.CURL_GLOBAL_ALL);
-            if (result != CURLcode.CURLE_OK)
+            // curl_global_init call handled by Interop.LibCurl's cctor
+
+            int age;
+            if (!Interop.Http.GetCurlVersionInfo(
+                out age, 
+                out s_supportsSSL, 
+                out s_supportsAutomaticDecompression, 
+                out s_supportsHttp2Multiplexing))
             {
-                throw new InvalidOperationException("Cannot use libcurl in this process");
+                throw new InvalidOperationException(SR.net_http_unix_https_libcurl_no_versioninfo);  
             }
-            curlVersionInfoData = Marshal.PtrToStructure<CurlVersionInfoData>(Interop.libcurl.curl_version_info(CurlAge));
-            if (curlVersionInfoData.age < MinCurlAge)
+
+            // Verify the version of curl we're using is new enough
+            if (age < MinCurlAge)
             {
                 throw new InvalidOperationException(SR.net_http_unix_https_libcurl_too_old);
             }
-            _supportsSSL = (CurlFeatures.CURL_VERSION_SSL & curlVersionInfoData.features) != 0;
-            _supportsAutomaticDecompression = (CurlFeatures.CURL_VERSION_LIBZ & curlVersionInfoData.features) != 0;
-        }
-
-        internal CurlHandler()
-        {
-            _multiHandle = Interop.libcurl.curl_multi_init();
-            if (_multiHandle.IsInvalid)
-            {
-                throw new HttpRequestException(SR.net_http_client_execution_error);
-            }
-            _multiHandle.Timer = new Timer(CurlTimerElapsed, _multiHandle, Timeout.Infinite, Timeout.Infinite);
-            SetCurlMultiOptions();
         }
 
         #region Properties
@@ -120,6 +110,14 @@ namespace System.Net.Http
             }
         }
 
+        internal bool SupportsRedirectConfiguration
+        {
+            get
+            {
+                return true;
+            }
+        }
+
         internal bool UseProxy
         {
             get
@@ -130,14 +128,9 @@ namespace System.Net.Http
             set
             {
                 CheckDisposedOrStarted();
-                if (value)
-                {
-                    _proxyPolicy = ProxyUsePolicy.UseCustomProxy;
-                }
-                else
-                {
-                    _proxyPolicy = ProxyUsePolicy.DoNotUseProxy;
-                }
+                _proxyPolicy = value ?
+                    ProxyUsePolicy.UseCustomProxy :
+                    ProxyUsePolicy.DoNotUseProxy;
             }
         }
 
@@ -172,15 +165,13 @@ namespace System.Net.Http
         {
             get
             {
-                return ClientCertificateOption.Manual;
+                return _clientCertificateOption;
             }
 
             set
             {
-                if (ClientCertificateOption.Manual != value)
-                {
-                    throw new PlatformNotSupportedException(SR.net_http_unix_invalid_client_cert_option);
-                }
+                CheckDisposedOrStarted();
+                _clientCertificateOption = value;
             }
         }
 
@@ -188,7 +179,7 @@ namespace System.Net.Http
         {
             get
             {
-                return _supportsAutomaticDecompression;
+                return s_supportsAutomaticDecompression;
             }
         }
 
@@ -216,7 +207,7 @@ namespace System.Net.Http
             {
                 CheckDisposedOrStarted();
                 _preAuthenticate = value;
-                if (value)
+                if (value && _credentialCache == null)
                 {
                     _credentialCache = new CredentialCache();
                 }
@@ -265,7 +256,7 @@ namespace System.Net.Http
                     throw new ArgumentOutOfRangeException(
                         "value",
                         value,
-                        string.Format(SR.net_http_value_must_be_greater_than, 0));
+                        SR.Format(SR.net_http_value_must_be_greater_than, 0));
                 }
 
                 CheckDisposedOrStarted();
@@ -273,22 +264,24 @@ namespace System.Net.Http
             }
         }
 
+        /// <summary>
+        ///   <b> UseDefaultCredentials is a no op on Unix </b>
+        /// </summary>
+        internal bool UseDefaultCredentials
+        {
+            get
+            {
+                return false;
+            }
+            set
+            {
+            }
+        }
         #endregion
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && !_disposed)
-            {
-                _disposed = true;
-                // TODO: Check for the correct place to free this since
-                //       its lifetime should match _multiHandle
-                //if (_multiHandlePtr.IsAllocated)
-                //{
-                //    _multiHandlePtr.Free();
-                //}
-                _multiHandle = null;
-            }
-
+            _disposed = true;
             base.Dispose(disposing);
         }
 
@@ -301,14 +294,16 @@ namespace System.Net.Http
                 throw new ArgumentNullException("request", SR.net_http_handler_norequest);
             }
 
-            if ((request.RequestUri.Scheme != UriSchemeHttp) && (request.RequestUri.Scheme != UriSchemeHttps))
+            if (request.RequestUri.Scheme == UriSchemeHttps)
             {
-                throw NotImplemented.ByDesignWithMessage(SR.net_http_client_http_baseaddress_required);
+                if (!s_supportsSSL)
+                {
+                    throw new PlatformNotSupportedException(SR.net_http_unix_https_support_unavailable_libcurl);
+                }
             }
-
-            if (request.RequestUri.Scheme == UriSchemeHttps && !_supportsSSL)
+            else
             {
-                throw new PlatformNotSupportedException(SR.net_http_unix_https_support_unavailable_libcurl);
+                Debug.Assert(request.RequestUri.Scheme == UriSchemeHttp, "HttpClient expected to validate scheme as http or https.");
             }
 
             if (request.Headers.TransferEncodingChunked.GetValueOrDefault() && (request.Content == null))
@@ -316,101 +311,43 @@ namespace System.Net.Http
                 throw new InvalidOperationException(SR.net_http_chunked_not_allowed_with_empty_content);
             }
 
-            // TODO: Check that SendAsync is not being called again for same request object.
-            //       Probably fix is needed in WinHttpHandler as well
+            if (_useCookie && _cookieContainer == null)
+            {
+                throw new InvalidOperationException(SR.net_http_invalid_cookiecontainer);
+            }
 
             CheckDisposed();
-
             SetOperationStarted();
 
+            // Do an initial cancellation check to avoid initiating the async operation if
+            // cancellation has already been requested.  After this, we'll rely on CancellationToken.Register
+            // to notify us of cancellation requests and shut down the operation if possible.
             if (cancellationToken.IsCancellationRequested)
             {
                 return Task.FromCanceled<HttpResponseMessage>(cancellationToken);
             }
 
-            // Create RequestCompletionSource object and save current values of handler settings.
-            RequestCompletionSource state = new RequestCompletionSource(this, cancellationToken, request);
-
-            BeginRequest(state);
-            return state.Task;
+            // Create the easy request.  This associates the easy request with this handler and configures
+            // it based on the settings configured for the handler.
+            var easy = new EasyRequest(this, request, cancellationToken);
+            try
+            {
+                easy.InitializeCurl();
+                if (easy._requestContentStream != null)
+                {
+                    easy._requestContentStream.Run();
+                }
+                _agent.Queue(new MultiAgent.IncomingRequest { Easy = easy, Type = MultiAgent.IncomingRequestType.New });
+            }
+            catch (Exception exc)
+            {
+                easy.FailRequest(exc);
+                easy.Cleanup(); // no active processing remains, so we can cleanup
+            }
+            return easy.Task;
         }
 
         #region Private methods
-
-        private async void BeginRequest(RequestCompletionSource state)
-        {
-            SafeCurlHandle requestHandle = new SafeCurlHandle();
-            GCHandle stateHandle = new GCHandle();
-
-            try
-            {
-                // Prepare context objects
-                state.ResponseMessage = new CurlResponseMessage(state.RequestMessage);
-                stateHandle = GCHandle.Alloc(state);
-                requestHandle = CreateRequestHandle(state, stateHandle);
-                state.RequestHandle = requestHandle;
-
-                if (state.RequestMessage.Content != null)
-                {
-                    Stream requestContentStream =
-                        await state.RequestMessage.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                    state.RequestContentStream = requestContentStream;
-                    if (state.CancellationToken.IsCancellationRequested)
-                    {
-                        RemoveEasyHandle(_multiHandle, stateHandle, state);
-                        state.TrySetCanceled(state.CancellationToken);
-                        return;
-                    }
-                    state.RequestContentBuffer = new byte[s_requestBufferSize];
-                }
-
-                AddEasyHandle(state);
-            }
-            catch (Exception ex)
-            {
-                RemoveEasyHandle(_multiHandle, stateHandle, state);
-                HandleAsyncException(state, ex);
-            }
-        }
-
-        private static void EndRequest(SafeCurlMultiHandle multiHandle, IntPtr statePtr, int result)
-        {
-            GCHandle stateHandle = GCHandle.FromIntPtr(statePtr);
-            RequestCompletionSource state = (RequestCompletionSource)stateHandle.Target;
-
-            if (CURLcode.CURLE_OK == result && state.ResponseMessage.StatusCode != HttpStatusCode.Unauthorized && state.Handler.PreAuthenticate)
-            {
-                ulong availedAuth;
-                if (Interop.libcurl.curl_easy_getinfo(state.RequestHandle, CURLINFO.CURLINFO_HTTPAUTH_AVAIL, out availedAuth) == CURLcode.CURLE_OK)
-                {
-                    state.Handler.AddCredentialToCache(state.RequestMessage.RequestUri, availedAuth, state.NetworkCredential);
-                }
-                // ignore errors
-                // There is no point in killing the request for the sake of putting the credentials into the cache
-            }
-
-            RemoveEasyHandle(multiHandle, stateHandle, true);
-
-            try
-            {
-                // No more callbacks so no more data
-                state.ResponseMessage.ContentStream.SignalComplete();
-
-                if (CURLcode.CURLE_OK == result)
-                {
-                    state.TrySetResult(state.ResponseMessage);
-                }
-                else
-                {
-                    state.TrySetException(new HttpRequestException(SR.net_http_client_execution_error,
-                        GetCurlException(result)));
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleAsyncException(state, ex);
-            }
-        }
 
         private void SetOperationStarted()
         {
@@ -420,241 +357,105 @@ namespace System.Net.Http
             }
         }
 
-        private SafeCurlHandle CreateRequestHandle(RequestCompletionSource state, GCHandle stateHandle)
-        {
-            // TODO: If this impacts perf, optimize using a handle pool
-            SafeCurlHandle requestHandle = Interop.libcurl.curl_easy_init();
-            if (requestHandle.IsInvalid)
-            {
-                throw new HttpRequestException(SR.net_http_client_execution_error);
-            }
-
-            SetCurlOption(requestHandle, CURLoption.CURLOPT_URL, state.RequestMessage.RequestUri.AbsoluteUri);
-            if (_automaticRedirection)
-            {
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_FOLLOWLOCATION, 1L);
-                
-                // Set maximum automatic redirection option
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_MAXREDIRS, _maxAutomaticRedirections);
-            }
-
-            if (state.RequestMessage.Method == HttpMethod.Put)
-            {
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_UPLOAD, 1L);
-            }
-            else if (state.RequestMessage.Method == HttpMethod.Head)
-            {
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_NOBODY, 1L);
-            }
-            else if (state.RequestMessage.Method == HttpMethod.Post)
-            {
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_POST, 1L);
-                if (state.RequestMessage.Content == null)
-                {
-                    SetCurlOption(requestHandle, CURLoption.CURLOPT_POSTFIELDSIZE, 0L);
-                    SetCurlOption(requestHandle, CURLoption.CURLOPT_COPYPOSTFIELDS, String.Empty);
-                }
-            }
-
-            IntPtr statePtr = GCHandle.ToIntPtr(stateHandle);
-            SetCurlOption(requestHandle, CURLoption.CURLOPT_PRIVATE, statePtr);
-
-            SetCurlCallbacks(requestHandle, state.RequestMessage, statePtr);
-
-            if (_supportsAutomaticDecompression)
-            {
-                SetRequestHandleDecompressionOptions(requestHandle);
-            }
-
-            SetProxyOptions(requestHandle, state.RequestMessage.RequestUri);
-
-            SetRequestHandleCredentialsOptions(requestHandle, state);
-
-            SetCookieOption(requestHandle, state.RequestMessage.RequestUri);
-
-            state.RequestHeaderHandle = SetRequestHeaders(requestHandle, state.RequestMessage);
-
-            return requestHandle;
-        }
-
-        private void SetRequestHandleDecompressionOptions(SafeCurlHandle requestHandle)
-        {
-            bool gzip = (AutomaticDecompression & DecompressionMethods.GZip) != 0;
-            bool deflate = (AutomaticDecompression & DecompressionMethods.Deflate) != 0;
-            if (gzip || deflate)
-            {
-                string encoding = (gzip && deflate) ?
-                                   EncodingNameGzip + "," + EncodingNameDeflate :
-                                   gzip ? EncodingNameGzip :
-                                   EncodingNameDeflate ;
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_ACCEPTENCODING, encoding);
-            }
-        }
-
-        private void SetProxyOptions(SafeCurlHandle requestHandle, Uri requestUri)
-        {
-            if (_proxyPolicy == ProxyUsePolicy.DoNotUseProxy)
-            {
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_PROXY, string.Empty);
-                return;
-            }
-
-            if ((_proxyPolicy == ProxyUsePolicy.UseDefaultProxy) || (Proxy == null))
-            {
-                return;
-            }
-
-            Debug.Assert( (Proxy != null) && (_proxyPolicy == ProxyUsePolicy.UseCustomProxy));
-            if (Proxy.IsBypassed(requestUri))
-            {
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_PROXY, string.Empty);
-                return;
-            }
-
-            var proxyUri = Proxy.GetProxy(requestUri);
-            if (proxyUri == null)
-            {
-                return;
-            }
-
-            SetCurlOption(requestHandle, CURLoption.CURLOPT_PROXYTYPE, CURLProxyType.CURLPROXY_HTTP);
-            SetCurlOption(requestHandle, CURLoption.CURLOPT_PROXY, proxyUri.AbsoluteUri);
-            SetCurlOption(requestHandle, CURLoption.CURLOPT_PROXYPORT, proxyUri.Port);
-            NetworkCredential credentials = GetCredentials(Proxy.Credentials, requestUri);
-            if (credentials != null)
-            {
-                if (string.IsNullOrEmpty(credentials.UserName))
-                {
-                    throw new ArgumentException(SR.net_http_argument_empty_string, "UserName");
-                }
-
-                string credentialText;
-                if (string.IsNullOrEmpty(credentials.Domain))
-                {
-                    credentialText = string.Format("{0}:{1}", credentials.UserName, credentials.Password);
-                }
-                else
-                {
-                    credentialText = string.Format("{2}\\{0}:{1}", credentials.UserName, credentials.Password, credentials.Domain);
-                }
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_PROXYUSERPWD, credentialText);
-            }
-        }
-
-        private void SetRequestHandleCredentialsOptions(SafeCurlHandle requestHandle, RequestCompletionSource state)
-        {
-            NetworkCredential credentials = GetNetworkCredentials(state.Handler._serverCredentials, state.RequestMessage.RequestUri);
-            if (credentials != null)
-            {
-                string userName = string.IsNullOrEmpty(credentials.Domain) ?
-                    credentials.UserName :
-                    string.Format("{0}\\{1}", credentials.Domain, credentials.UserName);
-
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_USERNAME, userName);
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_HTTPAUTH, CURLAUTH.AuthAny);
-                if (credentials.Password != null)
-                {
-                    SetCurlOption(requestHandle, CURLoption.CURLOPT_PASSWORD, credentials.Password);
-                }
-
-                state.NetworkCredential = credentials;
-            }
-        }
-
-        private NetworkCredential GetNetworkCredentials(ICredentials credentials, Uri requestUri)
+        private KeyValuePair<NetworkCredential, CURLAUTH> GetNetworkCredentials(ICredentials credentials, Uri requestUri)
         {
             if (_preAuthenticate)
             {
-                NetworkCredential nc = null;
-                lock (_multiHandle)
+                KeyValuePair<NetworkCredential, CURLAUTH> ncAndScheme;
+                lock (LockObject)
                 {
-                    nc = GetCredentials(_credentialCache, requestUri);
+                    Debug.Assert(_credentialCache != null, "Expected non-null credential cache");
+                    ncAndScheme = GetCredentials(_credentialCache, requestUri);
                 }
-                if (nc != null)
+                if (ncAndScheme.Key != null)
                 {
-                    return nc;
+                    return ncAndScheme;
                 }
             }
 
             return GetCredentials(credentials, requestUri);
         }
 
-        private void SetCookieOption(SafeCurlHandle requestHandle, Uri requestUri)
+        private void AddCredentialToCache(Uri serverUri, CURLAUTH authAvail, NetworkCredential nc)
         {
-            if (!_useCookie)
+            lock (LockObject)
             {
-                return;
-            }
-            else if (_cookieContainer == null)
-            {
-                throw new InvalidOperationException(SR.net_http_invalid_cookiecontainer);
-            }
-
-            string cookieValues = _cookieContainer.GetCookieHeader(requestUri);                    
-
-            if (cookieValues != null)
-            {
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_COOKIE, cookieValues);
-            }           
-        }
-
-        private void AddCredentialToCache(Uri serverUri, ulong authAvail, NetworkCredential nc)
-        {
-            lock (_multiHandle)
-            {
-                for (int i=0; i < AuthSchemePriorityOrder.Length; i++)
+                for (int i=0; i < s_authSchemePriorityOrder.Length; i++)
                 {
-                    if ((authAvail & AuthSchemePriorityOrder[i]) != 0 )
+                    if ((authAvail & s_authSchemePriorityOrder[i]) != 0)
                     {
-                        _credentialCache.Add(serverUri, AuthenticationSchemes[i], nc);
+                        Debug.Assert(_credentialCache != null, "Expected non-null credential cache");
+                        try
+                        {
+                            _credentialCache.Add(serverUri, s_authenticationSchemes[i], nc);
+                        }
+                        catch(ArgumentException)
+                        {
+                            //Ignore the case of key already present
+                        }
                     }
                 }
             }
         }
 
-		private static NetworkCredential GetCredentials(ICredentials credentials, Uri requestUri)
+        private void AddResponseCookies(Uri serverUri, HttpResponseMessage response)
         {
-            if (credentials == null)
-            {
-                return null;
-            }
-
-            foreach (var authScheme in AuthenticationSchemes)
-            {
-                NetworkCredential networkCredential = credentials.GetCredential(requestUri, authScheme);
-                if (networkCredential != null)
-                {
-                    return networkCredential;
-                }
-            }
-            return null;
-        }
-
-        private static void HandleAsyncException(RequestCompletionSource state, Exception ex)
-        {
-            if ((null == ex) && state.CancellationToken.IsCancellationRequested)
-            {
-                state.TrySetCanceled(state.CancellationToken);
-            }
-            if (null == ex)
+            if (!_useCookie)
             {
                 return;
             }
-            var oce = (ex as OperationCanceledException);
-            if (oce != null)
+
+            if (response.Headers.Contains(HttpKnownHeaderNames.SetCookie))
             {
-                // If the exception was due to the cancellation token being canceled, throw cancellation exception.
-                Debug.Assert(state.CancellationToken.IsCancellationRequested);
-                state.TrySetCanceled(oce.CancellationToken);
+                IEnumerable<string> cookieHeaders = response.Headers.GetValues(HttpKnownHeaderNames.SetCookie);
+                foreach (var cookieHeader in cookieHeaders)
+                {
+                    try
+                    {
+                        _cookieContainer.SetCookies(serverUri, cookieHeader);
+                    }
+                    catch (CookieException e)
+                    {
+                        string msg = string.Format("Malformed cookie: SetCookies Failed with {0}, server: {1}, cookie:{2}",
+                                                   e.Message,
+                                                   serverUri.OriginalString,
+                                                   cookieHeader);
+                        VerboseTrace(msg);
+                    }
+                }
             }
-            else if (ex is HttpRequestException)
+        }
+
+        private static KeyValuePair<NetworkCredential, CURLAUTH> GetCredentials(ICredentials credentials, Uri requestUri)
+        {
+            NetworkCredential nc = null;
+            CURLAUTH curlAuthScheme = CURLAUTH.None;
+
+            if (credentials != null)
             {
-                state.TrySetException(ex);
+                // we collect all the schemes that are accepted by libcurl for which there is a non-null network credential.
+                // But CurlHandler works under following assumption:
+                //           for a given server, the credentials do not vary across authentication schemes.
+                for (int i=0; i < s_authSchemePriorityOrder.Length; i++)
+                {
+                    NetworkCredential networkCredential = credentials.GetCredential(requestUri, s_authenticationSchemes[i]);
+                    if (networkCredential != null)
+                    {
+                        curlAuthScheme |= s_authSchemePriorityOrder[i];
+                        if (nc == null)
+                        {
+                            nc = networkCredential;
+                        }
+                        else if(!AreEqualNetworkCredentials(nc, networkCredential))
+                        {
+                            throw new PlatformNotSupportedException(SR.net_http_unix_invalid_credential);
+                        }
+                    }
+                }
             }
-            else
-            {
-                state.TrySetException(new HttpRequestException(SR.net_http_client_execution_error, ex));
-            }
+
+            VerboseTrace("curlAuthScheme = " + curlAuthScheme);
+            return new KeyValuePair<NetworkCredential, CURLAUTH>(nc, curlAuthScheme); ;
         }
 
         private void CheckDisposed()
@@ -674,219 +475,151 @@ namespace System.Net.Http
             }
         }
 
-        private static string GetCurlErrorString(int code, bool isMulti = false)
+        private static void ThrowIfCURLEError(CURLcode error)
         {
-            IntPtr ptr = isMulti ? Interop.libcurl.curl_multi_strerror(code) : Interop.libcurl.curl_easy_strerror(code);
-            return Marshal.PtrToStringAnsi(ptr);
-        }
-
-        private static Exception GetCurlException(int code, bool isMulti = false)
-        {
-            return new Exception(GetCurlErrorString(code, isMulti));
-        }
-
-        private void SetCurlCallbacks(SafeCurlHandle requestHandle, HttpRequestMessage request, IntPtr stateHandle)
-        {
-            SetCurlOption(requestHandle, CURLoption.CURLOPT_HEADERDATA, stateHandle);
-            SetCurlOption(requestHandle, CURLoption.CURLOPT_HEADERFUNCTION, s_receiveHeadersCallback);
-            if (request.Method != HttpMethod.Head)
+            if (error != CURLcode.CURLE_OK)
             {
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_WRITEDATA, stateHandle);
-                unsafe
+                var inner = new CurlException((int)error, isMulti: false);
+                VerboseTrace(inner.Message);
+                throw inner;
+            }
+        }
+
+        private static void ThrowIfCURLMError(CURLMcode error)
+        {
+            if (error != CURLMcode.CURLM_OK)
+            {
+                string msg = CurlException.GetCurlErrorString((int)error, true);
+                VerboseTrace(msg);
+                switch (error)
                 {
-                    SetCurlOption(requestHandle, CURLoption.CURLOPT_WRITEFUNCTION, s_receiveBodyCallback);
+                    case CURLMcode.CURLM_ADDED_ALREADY:
+                    case CURLMcode.CURLM_BAD_EASY_HANDLE:
+                    case CURLMcode.CURLM_BAD_HANDLE:
+                    case CURLMcode.CURLM_BAD_SOCKET:
+                        throw new ArgumentException(msg);
+                    case CURLMcode.CURLM_UNKNOWN_OPTION:
+                        throw new ArgumentOutOfRangeException(msg);
+                    case CURLMcode.CURLM_OUT_OF_MEMORY:
+                        throw new OutOfMemoryException(msg);
+                    case CURLMcode.CURLM_INTERNAL_ERROR:
+                    default:
+                        throw new CurlException((int)error, msg);
                 }
             }
-            if (request.Content != null)
+        }
+
+        private static bool AreEqualNetworkCredentials(NetworkCredential credential1, NetworkCredential credential2)
+        {
+            Debug.Assert(credential1 != null && credential2 != null, "arguments are non-null in network equality check");
+            return credential1.UserName == credential2.UserName &&
+                credential1.Domain == credential2.Domain &&
+                string.Equals(credential1.Password, credential2.Password, StringComparison.Ordinal);
+        }
+
+        [Conditional(VerboseDebuggingConditional)]
+        private static void VerboseTrace(string text = null, [CallerMemberName] string memberName = null, EasyRequest easy = null, MultiAgent agent = null)
+        {
+            // If we weren't handed a multi agent, see if we can get one from the EasyRequest
+            if (agent == null && easy != null && easy._associatedMultiAgent != null)
             {
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_READDATA, stateHandle);
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_READFUNCTION, s_sendCallback);
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_IOCTLDATA, stateHandle);
-                SetCurlOption(requestHandle, CURLoption.CURLOPT_IOCTLFUNCTION, s_sendIoCtlCallback);
+                agent = easy._associatedMultiAgent;
+            }
+            int? agentId = agent != null ? agent.RunningWorkerId : null;
+
+            // Get an ID string that provides info about which MultiAgent worker and which EasyRequest this trace is about
+            string ids = "";
+            if (agentId != null || easy != null)
+            {
+                ids = "(" +
+                    (agentId != null ? "M#" + agentId : "") +
+                    (agentId != null && easy != null ? ", " : "") +
+                    (easy != null ? "E#" + easy.Task.Id : "") +
+                    ")";
+            }
+
+            // Create the message and trace it out
+            string msg = string.Format("[{0, -30}]{1, -16}: {2}", memberName, ids, text);
+            Interop.Sys.PrintF("%s\n", msg);
+        }
+
+        [Conditional(VerboseDebuggingConditional)]
+        private static void VerboseTraceIf(bool condition, string text = null, [CallerMemberName] string memberName = null, EasyRequest easy = null)
+        {
+            if (condition)
+            {
+                VerboseTrace(text, memberName, easy, agent: null);
             }
         }
 
-        private void SetCurlOption(SafeCurlHandle handle, int option, string value)
+        private static Exception CreateHttpRequestException(Exception inner = null)
         {
-            int result = Interop.libcurl.curl_easy_setopt(handle, option, value);
-            if (result != CURLcode.CURLE_OK)
-            {
-                throw new HttpRequestException(SR.net_http_client_execution_error, GetCurlException(result));
-            }
+            return new HttpRequestException(SR.net_http_client_execution_error, inner);
         }
 
-        private void SetCurlOption(SafeCurlHandle handle, int option, long value)
+        private static bool TryParseStatusLine(HttpResponseMessage response, string responseHeader, EasyRequest state)
         {
-            int result = Interop.libcurl.curl_easy_setopt(handle, option, value);
-            if (result != CURLcode.CURLE_OK)
+            if (!responseHeader.StartsWith(CurlResponseParseUtils.HttpPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                throw new HttpRequestException(SR.net_http_client_execution_error, GetCurlException(result));
+                return false;
             }
+
+            // Clear the header if status line is recieved again. This signifies that there are multiple response headers (like in redirection).
+            response.Headers.Clear();
+            response.Content.Headers.Clear();
+
+            CurlResponseParseUtils.ReadStatusLine(response, responseHeader);
+            state._isRedirect = state._handler.AutomaticRedirection &&
+                         (response.StatusCode == HttpStatusCode.Redirect ||
+                         response.StatusCode == HttpStatusCode.RedirectKeepVerb ||
+                         response.StatusCode == HttpStatusCode.RedirectMethod) ;
+            return true;
         }
 
-        private void SetCurlOption(SafeCurlHandle handle, int option, ulong value)
+        private static void HandleRedirectLocationHeader(EasyRequest state, string locationValue)
         {
-            int result = Interop.libcurl.curl_easy_setopt(handle, option, value);
-            if (result != CURLcode.CURLE_OK)
-            {
-                throw new HttpRequestException(SR.net_http_client_execution_error, GetCurlException(result));
-            }
-        }
+            Debug.Assert(state._isRedirect);
+            Debug.Assert(state._handler.AutomaticRedirection);
 
-        private void SetCurlOption(SafeCurlHandle handle, int option, Interop.libcurl.curl_readwrite_callback value)
-        {
-            int result = Interop.libcurl.curl_easy_setopt(handle, option, value);
-            if (result != CURLcode.CURLE_OK)
+            string location = locationValue.Trim();
+            //only for absolute redirects
+            Uri forwardUri;
+            if (Uri.TryCreate(location, UriKind.RelativeOrAbsolute, out forwardUri) && forwardUri.IsAbsoluteUri)
             {
-                throw new HttpRequestException(SR.net_http_client_execution_error, GetCurlException(result));
-            }
-        }
-
-        private unsafe void SetCurlOption(SafeCurlHandle handle, int option, Interop.libcurl.curl_unsafe_write_callback value)
-        {
-            int result = Interop.libcurl.curl_easy_setopt(handle, option, value);
-            if (result != CURLcode.CURLE_OK)
-            {
-                throw new HttpRequestException(SR.net_http_client_execution_error, GetCurlException(result));
-            }
-        }
-
-        private void SetCurlOption(SafeCurlHandle handle, int option, Interop.libcurl.curl_ioctl_callback value)
-        {
-            int result = Interop.libcurl.curl_easy_setopt(handle, option, value);
-            if (result != CURLcode.CURLE_OK)
-            {
-                throw new HttpRequestException(SR.net_http_client_execution_error, GetCurlException(result));
-            }
-        }
-
-        private void SetCurlOption(SafeCurlHandle handle, int option, IntPtr value)
-        {
-            int result = Interop.libcurl.curl_easy_setopt(handle, option, value);
-            if (result != CURLcode.CURLE_OK)
-            {
-                throw new HttpRequestException(SR.net_http_client_execution_error, GetCurlException(result));
-            }
-        }
-
-        private void SetCurlMultiOptions()
-        {
-            _multiHandlePtr = GCHandle.Alloc(_multiHandle);
-            IntPtr callbackContext = GCHandle.ToIntPtr(_multiHandlePtr);
-            int result = Interop.libcurl.curl_multi_setopt(_multiHandle, CURLMoption.CURLMOPT_SOCKETFUNCTION, s_socketCallback);
-            if (result == CURLMcode.CURLM_OK)
-            {
-                result = Interop.libcurl.curl_multi_setopt(_multiHandle, CURLMoption.CURLMOPT_TIMERFUNCTION, s_multiTimerCallback);
-            }
-            if (result == CURLMcode.CURLM_OK)
-            {
-                result = Interop.libcurl.curl_multi_setopt(_multiHandle, CURLMoption.CURLMOPT_TIMERDATA, callbackContext);
-            }
-            if (result != CURLMcode.CURLM_OK)
-            {
-                throw new HttpRequestException(SR.net_http_client_execution_error, GetCurlException(result, true));
-            }
-        }
-
-        private SafeCurlSlistHandle SetRequestHeaders(SafeCurlHandle handle, HttpRequestMessage request)
-        {
-            SafeCurlSlistHandle retVal = new SafeCurlSlistHandle();
-            if (request.Headers == null)
-            {
-                return retVal;
-            }
-
-            HttpHeaders contentHeaders = null;
-            if (request.Content != null)
-            {
-                SetChunkedModeForSend(request);
-
-                // TODO: Content-Length header isn't getting correctly placed using ToString()
-                // This is a bug in HttpContentHeaders that needs to be fixed.
-                if (request.Content.Headers.ContentLength.HasValue)
+                KeyValuePair<NetworkCredential, CURLAUTH> ncAndScheme = GetCredentials(state._handler.Credentials as CredentialCache, forwardUri);
+                if (ncAndScheme.Key != null)
                 {
-                    long contentLength = request.Content.Headers.ContentLength.Value;
-                    request.Content.Headers.ContentLength = null;
-                    request.Content.Headers.ContentLength = contentLength;
+                    state.SetCredentialsOptions(ncAndScheme);
                 }
-                contentHeaders = request.Content.Headers;
-            }
-
-            bool gotReference = false;
-            try
-            {
-                retVal.DangerousAddRef(ref gotReference);
-                IntPtr rawHandle = IntPtr.Zero;
-
-                if (request.Headers != null)
+                else
                 {
-                    // Add request headers
-                    AddRequestHeaders(request.Headers, retVal, ref rawHandle);
+                    state.SetCurlOption(CURLoption.CURLOPT_USERNAME, IntPtr.Zero);
+                    state.SetCurlOption(CURLoption.CURLOPT_PASSWORD, IntPtr.Zero);
                 }
 
-                if (contentHeaders != null)
-                {
-                    // Add content request headers
-                    AddRequestHeaders(contentHeaders, retVal, ref rawHandle);
-                }
+                // reset proxy - it is possible that the proxy has different credentials for the new URI
+                state.SetProxyOptions(forwardUri);
 
-                // Since libcurl always adds a Transfer-Encoding header, we need to explicitly block
-                // it if caller specifically does not want to set the header
-                if (request.Headers.TransferEncodingChunked.HasValue && !request.Headers.TransferEncodingChunked.Value)
+                if (state._handler._useCookie)
                 {
-                    rawHandle = Interop.libcurl.curl_slist_append(rawHandle, NoTransferEncoding);
+                    // reset cookies.
+                    state.SetCurlOption(CURLoption.CURLOPT_COOKIE, IntPtr.Zero);
 
-                    if (rawHandle == null)
-                    {
-                        throw new HttpRequestException(SR.net_http_client_execution_error);
-                    }
-
-                    retVal.SetHandle(rawHandle);
+                    // set cookies again
+                    state.SetCookieOption(forwardUri);
                 }
-
-                if (!retVal.IsInvalid)
-                {
-                    SetCurlOption(handle, CURLoption.CURLOPT_HTTPHEADER, rawHandle);
-                }
-            }
-            finally
-            {
-                if (gotReference)
-                {
-                    retVal.DangerousRelease();
-                }
+                state._requestMessage.RequestUri = forwardUri;
             }
 
-            return retVal;
-        }
-
-        /// <summary>
-        /// Add request headers to curl API
-        /// </summary>
-        /// <param name="headers"></param>
-        /// <param name="handle"></param>
-        /// <param name="rawHandle"></param>
-        private static void AddRequestHeaders(HttpHeaders headers, SafeCurlSlistHandle handle, ref IntPtr rawHandle)
-        {
-            foreach (KeyValuePair<string, IEnumerable<string>> header in headers)
-            {
-                string headerStr = header.Key + ": " + headers.GetHeaderString(header.Key);
-                rawHandle = Interop.libcurl.curl_slist_append(rawHandle, headerStr);
-
-                if (rawHandle == null)
-                {
-                    throw new HttpRequestException(SR.net_http_client_execution_error);
-                }
-
-                handle.SetHandle(rawHandle);
-            }
+            // set the headers again. This is a workaround for libcurl's limitation in handling headers with empty values
+            state.SetRequestHeaders();
         }
 
         private static void SetChunkedModeForSend(HttpRequestMessage request)
         {
             bool chunkedMode = request.Headers.TransferEncodingChunked.GetValueOrDefault();
             HttpContent requestContent = request.Content;
-            Debug.Assert(requestContent != null);
+            Debug.Assert(requestContent != null, "request is null");
 
             // Deal with conflict between 'Content-Length' vs. 'Transfer-Encoding: chunked' semantics.
             // libcurl adds a Tranfer-Encoding header by default and the request fails if both are set.
@@ -903,169 +636,15 @@ namespace System.Net.Http
                     request.Headers.TransferEncodingChunked = false;
                 }
             }
-        }
-
-        private void AddEasyHandle(RequestCompletionSource state)
-        {
-            bool gotReference = false;
-            SafeCurlHandle requestHandle = state.RequestHandle;
-            try
+            else if (!chunkedMode)
             {
-                requestHandle.DangerousAddRef(ref gotReference);
-                lock (_multiHandle)
-                {
-                    int result = Interop.libcurl.curl_multi_add_handle(_multiHandle, requestHandle);
-                    if (result != CURLcode.CURLE_OK)
-                    {
-                        throw new HttpRequestException(SR.net_http_client_execution_error,
-                            GetCurlException(result, true));
-                    }
-                    state.SessionHandle = _multiHandle;
-                    _multiHandle.RequestCount = _multiHandle.RequestCount + 1;
-                    if (_multiHandle.PollCancelled)
-                    {
-                        // TODO: Create single polling thread for all HttpClientHandler objects
-                        Task.Factory.StartNew(s => PollFunction(((CurlHandler)s)._multiHandle), this,
-                                CancellationToken.None, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
-                        _multiHandle.PollCancelled = false;
-                    }
-                    bool ignored = false;
-                    _multiHandle.DangerousAddRef(ref ignored);
-                }
-                // Note that we are deliberately not decreasing the ref counts of
-                // the multi and easy handles since that will be done in RemoveEasyHandle
-                // when the request is completed and the handles are used in an
-                // unmanaged context till then
-                // TODO: Investigate if SafeCurlHandle is really useful since we are not
-                //       avoiding any leaks due to the ref count increment
-            }
-            catch (Exception)
-            {
-                if (gotReference)
-                {
-                    requestHandle.DangerousRelease();
-                }
-                throw;
-            }
-        }
-
-        private static void RemoveEasyHandle(SafeCurlMultiHandle multiHandle, GCHandle stateHandle, RequestCompletionSource state)
-        {
-            if (stateHandle.IsAllocated)
-            {
-                stateHandle.Free();
-            }
-            RemoveEasyHandle(multiHandle, state, false);
-        }
-
-        private static void RemoveEasyHandle(SafeCurlMultiHandle multiHandle, GCHandle stateHandle, bool onMultiStack)
-        {
-            Debug.Assert(stateHandle.IsAllocated);
-
-            RequestCompletionSource state = (RequestCompletionSource)stateHandle.Target;
-            stateHandle.Free();
-            RemoveEasyHandle(multiHandle, state, onMultiStack);
-        }
-
-        private static void RemoveEasyHandle(SafeCurlMultiHandle multiHandle, RequestCompletionSource state, bool onMultiStack)
-        {
-            SafeCurlHandle requestHandle = state.RequestHandle;
-
-            if (onMultiStack)
-            {
-                Debug.Assert(!requestHandle.IsInvalid);
-                lock (multiHandle)
-                {
-                    Interop.libcurl.curl_multi_remove_handle(multiHandle, requestHandle);
-                    multiHandle.RequestCount = multiHandle.RequestCount - 1;
-                    multiHandle.SignalFdSetChange(state.SocketFd, true);
-                }
-                state.SessionHandle.DangerousRelease();
-                state.SessionHandle = null;
-                requestHandle.DangerousRelease();
-            }
-
-            if (state.RequestContentStream != null)
-            {
-                state.RequestContentStream.Dispose();
-            }
-
-            if (!state.RequestHeaderHandle.IsInvalid)
-            {
-                SafeCurlSlistHandle headerHandle = state.RequestHeaderHandle;
-                SafeCurlSlistHandle.DisposeAndClearHandle(ref headerHandle);
-            }
-
-            if (!requestHandle.IsInvalid)
-            {
-                SafeCurlHandle.DisposeAndClearHandle(ref requestHandle);
+                // Make sure Transfer-Encoding: chunked header is set, 
+                // as we have content to send but no known length for it.
+                request.Headers.TransferEncodingChunked = true;
             }
         }
 
         #endregion
-
-        private sealed class RequestCompletionSource : TaskCompletionSource<HttpResponseMessage>
-        {
-            private readonly CurlHandler _handler;
-            private readonly CancellationToken _cancellationToken;
-            private readonly HttpRequestMessage _requestMessage;
-
-
-            // TODO: The task completion can sometimes happen under a lock. So we need to ensure
-            //       that arbitrary blocking code cannot run when the task is marked for completion
-            //       So we are using RunContinuationsAsynchronously to force a diff. thread
-            public RequestCompletionSource(
-                    CurlHandler handler,
-                    CancellationToken cancellationToken,
-                    HttpRequestMessage request)
-                : base(TaskCreationOptions.RunContinuationsAsynchronously)
-            {
-                this._handler = handler;
-                this._cancellationToken = cancellationToken;
-                this._requestMessage = request;
-                this.SocketFd = -1;
-            }
-
-            public CurlResponseMessage ResponseMessage { get; set; }
-
-            public SafeCurlMultiHandle SessionHandle { get; set; }
-
-            public SafeCurlHandle RequestHandle { get; set; }
-
-            public SafeCurlSlistHandle RequestHeaderHandle { get; set; }
-
-            public Stream RequestContentStream { get; set; }
-
-            public byte[] RequestContentBuffer { get; set; }
-
-            public NetworkCredential NetworkCredential { get; set; }
-
-            public int SocketFd { get; set; }
-
-            public CurlHandler Handler
-            {
-                get
-                {
-                    return _handler;
-                }
-            }
-
-            public CancellationToken CancellationToken
-            {
-                get
-                {
-                    return _cancellationToken;
-                }
-            }
-
-            public HttpRequestMessage RequestMessage
-            {
-                get
-                {
-                    return _requestMessage;
-                }
-            }
-        }
 
         private enum ProxyUsePolicy
         {

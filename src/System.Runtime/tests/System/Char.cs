@@ -4,7 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+
 using Xunit;
+
 public static class CharTests
 {
     [Fact]
@@ -42,6 +44,7 @@ public static class CharTests
             Assert.True(expected == null, "Expected an ArgumentOutOfRangeException");
         }
     }
+
     [Fact]
     public static void TestConvertFromUtf32()
     {
@@ -60,8 +63,8 @@ public static class CharTests
         ValidateConvertFromUtf32(0xDFFF, null);
         ValidateConvertFromUtf32(0x110000, null);
         ValidateConvertFromUtf32(-1, null);
-        ValidateConvertFromUtf32(Int32.MaxValue, null);
-        ValidateConvertFromUtf32(Int32.MinValue, null);
+        ValidateConvertFromUtf32(int.MaxValue, null);
+        ValidateConvertFromUtf32(int.MinValue, null);
     }
 
     private static void ValidateconverToUtf32<T>(string s, int i, int expected) where T : Exception
@@ -73,7 +76,7 @@ public static class CharTests
         }
         catch (T)
         {
-            Assert.True(expected == Int32.MinValue, "Expected an exception to be thrown");
+            Assert.True(expected == int.MinValue, "Expected an exception to be thrown");
         }
     }
 
@@ -97,20 +100,20 @@ public static class CharTests
         ValidateconverToUtf32<Exception>("\uD800\u0000", 1, 0);  // high, non-surrogate
         ValidateconverToUtf32<Exception>("\uDF01\u0000", 1, 0);  // low, non-surrogate
         // Invalid inputs
-        ValidateconverToUtf32<ArgumentException>("\uD800\uD800", 0, Int32.MinValue);  // high, high
-        ValidateconverToUtf32<ArgumentException>("\uD800\uD7FF", 0, Int32.MinValue);  // high, non-surrogate
-        ValidateconverToUtf32<ArgumentException>("\uD800\u0000", 0, Int32.MinValue);  // high, non-surrogate
-        ValidateconverToUtf32<ArgumentException>("\uDC01\uD940", 0, Int32.MinValue);  // low, high
-        ValidateconverToUtf32<ArgumentException>("\uDD00\uDE00", 0, Int32.MinValue);  // low, low
-        ValidateconverToUtf32<ArgumentException>("\uDF01\u0000", 0, Int32.MinValue);  // low, non-surrogate
-        ValidateconverToUtf32<ArgumentException>("\uD800\uD800", 1, Int32.MinValue);  // high, high
-        ValidateconverToUtf32<ArgumentException>("\uDC01\uD940", 1, Int32.MinValue);  // low, high
-        ValidateconverToUtf32<ArgumentException>("\uDD00\uDE00", 1, Int32.MinValue);  // low, low
-        ValidateconverToUtf32<ArgumentNullException>(null, 0, Int32.MinValue);  // null string
-        ValidateconverToUtf32<ArgumentOutOfRangeException>("", 0, Int32.MinValue);  // index out of range
-        ValidateconverToUtf32<ArgumentOutOfRangeException>("", -1, Int32.MinValue);  // index out of range
-        ValidateconverToUtf32<ArgumentOutOfRangeException>("abcde", -1, Int32.MinValue);  // index out of range
-        ValidateconverToUtf32<ArgumentOutOfRangeException>("abcde", 5, Int32.MinValue);  // index out of range
+        ValidateconverToUtf32<ArgumentException>("\uD800\uD800", 0, int.MinValue);  // high, high
+        ValidateconverToUtf32<ArgumentException>("\uD800\uD7FF", 0, int.MinValue);  // high, non-surrogate
+        ValidateconverToUtf32<ArgumentException>("\uD800\u0000", 0, int.MinValue);  // high, non-surrogate
+        ValidateconverToUtf32<ArgumentException>("\uDC01\uD940", 0, int.MinValue);  // low, high
+        ValidateconverToUtf32<ArgumentException>("\uDD00\uDE00", 0, int.MinValue);  // low, low
+        ValidateconverToUtf32<ArgumentException>("\uDF01\u0000", 0, int.MinValue);  // low, non-surrogate
+        ValidateconverToUtf32<ArgumentException>("\uD800\uD800", 1, int.MinValue);  // high, high
+        ValidateconverToUtf32<ArgumentException>("\uDC01\uD940", 1, int.MinValue);  // low, high
+        ValidateconverToUtf32<ArgumentException>("\uDD00\uDE00", 1, int.MinValue);  // low, low
+        ValidateconverToUtf32<ArgumentNullException>(null, 0, int.MinValue);  // null string
+        ValidateconverToUtf32<ArgumentOutOfRangeException>("", 0, int.MinValue);  // index out of range
+        ValidateconverToUtf32<ArgumentOutOfRangeException>("", -1, int.MinValue);  // index out of range
+        ValidateconverToUtf32<ArgumentOutOfRangeException>("abcde", -1, int.MinValue);  // index out of range
+        ValidateconverToUtf32<ArgumentOutOfRangeException>("abcde", 5, int.MinValue);  // index out of range
     }
 
     private static void ValidateconverToUtf32<T>(char c1, char c2, int expected) where T : Exception
@@ -122,7 +125,7 @@ public static class CharTests
         }
         catch (T)
         {
-            Assert.True(expected == Int32.MinValue, "Expected an exception to be thrown");
+            Assert.True(expected == int.MinValue, "Expected an exception to be thrown");
         }
     }
 
@@ -136,14 +139,14 @@ public static class CharTests
         ValidateconverToUtf32<Exception>('\uDBFF', '\uDC00', 0x10FC00);
         ValidateconverToUtf32<Exception>('\uDBFF', '\uDFFF', 0x10FFFF);
 
-        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uD800', '\uD800', Int32.MinValue);  // high, high
-        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uD800', '\uD7FF', Int32.MinValue);  // high, non-surrogate
-        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uD800', '\u0000', Int32.MinValue);  // high, non-surrogate
-        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uDC01', '\uD940', Int32.MinValue);  // low, high
-        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uDD00', '\uDE00', Int32.MinValue);  // low, low
-        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uDF01', '\u0000', Int32.MinValue);  // low, non-surrogate
-        ValidateconverToUtf32<ArgumentOutOfRangeException>('\u0032', '\uD7FF', Int32.MinValue);  // both non-surrogate
-        ValidateconverToUtf32<ArgumentOutOfRangeException>('\u0000', '\u0000', Int32.MinValue);  // both non-surrogate
+        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uD800', '\uD800', int.MinValue);  // high, high
+        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uD800', '\uD7FF', int.MinValue);  // high, non-surrogate
+        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uD800', '\u0000', int.MinValue);  // high, non-surrogate
+        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uDC01', '\uD940', int.MinValue);  // low, high
+        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uDD00', '\uDE00', int.MinValue);  // low, low
+        ValidateconverToUtf32<ArgumentOutOfRangeException>('\uDF01', '\u0000', int.MinValue);  // low, non-surrogate
+        ValidateconverToUtf32<ArgumentOutOfRangeException>('\u0032', '\uD7FF', int.MinValue);  // both non-surrogate
+        ValidateconverToUtf32<ArgumentOutOfRangeException>('\u0000', '\u0000', int.MinValue);  // both non-surrogate
     }
 
     [Fact]
@@ -766,7 +769,6 @@ public static class CharTests
     }
 
     [Fact]
-    [ActiveIssue(846, PlatformID.AnyUnix)]
     public static void TestToLower()
     {
         // Char Char.ToLower(Char)
@@ -790,7 +792,6 @@ public static class CharTests
     }
 
     [Fact]
-    [ActiveIssue(846, PlatformID.AnyUnix)]
     public static void TestToLowerInvariant()
     {
         // Char Char.ToLowerInvariant(Char)
@@ -830,7 +831,6 @@ public static class CharTests
     }
 
     [Fact]
-    [ActiveIssue(846, PlatformID.AnyUnix)]
     public static void TestToUpper()
     {
         // Char Char.ToUpper(Char)
@@ -854,7 +854,6 @@ public static class CharTests
     }
 
     [Fact]
-    [ActiveIssue(846, PlatformID.AnyUnix)]
     public static void TestToUpperInvariant()
     {
         // Char Char.ToUpperInvariant(Char)
@@ -1008,7 +1007,7 @@ public static class CharTests
         new char[] {'\u17db','\u20a2','\u20a5','\u20a8','\u20ab','\u20ae','\u20b1','\u20b4','\ufe69','\uffe1'}, // UnicodeCategory.CurrencySymbol
         new char[] {'\u02c5','\u02da','\u02e8','\u02f3','\u02fc','\u1fc0','\u1fee','\ua703','\ua70c','\ua715'}, // UnicodeCategory.ModifierSymbol
         new char[] {'\u0bf3','\u2316','\u24ac','\u25b2','\u26af','\u285c','\u2e8f','\u2f8c','\u3292','\u3392'}, // UnicodeCategory.OtherSymbol
-        new char[] {'\u037f','\u09c6','\u0dfa','\u2e5c','\ua9f9','\uabbd'}, // UnicodeCategory.OtherNotAssigned
+        new char[] {'\u09c6','\u0dfa','\u2e5c','\ua9f9','\uabbd'}, // UnicodeCategory.OtherNotAssigned
     };
 
     private static char[] s_highSurrogates = new char[] { '\ud800', '\udaaa', '\udbff' }; // range from '\ud800' to '\udbff'

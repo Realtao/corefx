@@ -59,6 +59,11 @@ namespace Internal.Cryptography.Pal
             }
         }
 
+        public bool SupportsLegacyBasicConstraintsExtension
+        {
+            get { return true; }
+        }
+
         public byte[] EncodeX509BasicConstraints2Extension(bool certificateAuthority, bool hasPathLengthConstraint, int pathLengthConstraint)
         {
             unsafe
@@ -157,7 +162,7 @@ namespace Internal.Cryptography.Pal
                         for (int i = 0; i < count; i++)
                         {
                             IntPtr oidValuePointer = pEnhKeyUsage->rgpszUsageIdentifier[i];
-                            String oidValue = Marshal.PtrToStringAnsi(oidValuePointer);
+                            string oidValue = Marshal.PtrToStringAnsi(oidValuePointer);
                             Oid oid = new Oid(oidValue);
                             localUsages.Add(oid);
                         }
@@ -166,7 +171,6 @@ namespace Internal.Cryptography.Pal
             }
 
             usages = localUsages;
-            return;
         }
 
         public byte[] EncodeX509SubjectKeyIdentifierExtension(byte[] subjectKeyIdentifier)
@@ -229,11 +233,11 @@ namespace Internal.Cryptography.Pal
                             int cb = 20;
                             byte[] buffer = new byte[cb];
                             if (!Interop.crypt32.CryptHashPublicKeyInfo(IntPtr.Zero, AlgId.CALG_SHA1, 0, CertEncodingType.All, ref publicKeyInfo, buffer, ref cb))
-                                throw new CryptographicException(Marshal.GetHRForLastWin32Error());
+                                throw Marshal.GetHRForLastWin32Error().ToCryptographicException();;
                             if (cb < buffer.Length)
                             {
                                 byte[] newBuffer = new byte[cb];
-                                Array.Copy(buffer, newBuffer, cb);
+                                Array.Copy(buffer, 0, newBuffer, 0, cb);
                                 buffer = newBuffer;
                             }
                             return buffer;

@@ -1,15 +1,15 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Globalization;
+using System.Linq;
+using System.Runtime.InteropServices;
 using Xunit;
 
 namespace System.Globalization.Tests
 {
     public class NumberFormatInfoCurrencyNegativePattern
     {
-        // PosTest1: Verify default value of property CurrencyNegativePattern
+        // TestDefault: Verify default value of property CurrencyNegativePattern
         [Fact]
         public void TestDefault()
         {
@@ -18,7 +18,7 @@ namespace System.Globalization.Tests
             Assert.Equal(0, expected);
         }
 
-        // PosTest2: Verify set value of property CurrencyNegativePattern
+        // TestSetValue: Verify set value of property CurrencyNegativePattern
         [Fact]
         public void TestSetValue()
         {
@@ -30,17 +30,17 @@ namespace System.Globalization.Tests
             }
         }
 
-        // NegTest1: ArgumentOutOfRangeException is not thrown
+        // TestArgumentOutOfRangeException: ArgumentOutOfRangeException is thrown
         [Fact]
-        public void NegTest1()
+        public void TestArgumentOutOfRangeException()
         {
             VerificationHelper<ArgumentOutOfRangeException>(-1);
             VerificationHelper<ArgumentOutOfRangeException>(16);
         }
 
-        // NegTest2: InvalidOperationException is not thrown
+        // TestInvalidOperationException: InvalidOperationException is thrown
         [Fact]
-        public void NegTest2()
+        public void TestInvalidOperationException()
         {
             NumberFormatInfo nfi = new NumberFormatInfo();
             NumberFormatInfo nfiReadOnly = NumberFormatInfo.ReadOnly(nfi);
@@ -50,6 +50,37 @@ namespace System.Globalization.Tests
             });
         }
 
+
+        // TestCurrencyNegativePatternLocale: Verify value of property CurrencyNegativePattern for specific locales
+        [Theory]
+        [InlineData("en-US")]
+        [InlineData("en-CA")]
+        [InlineData("fa-IR")]
+        [InlineData("fr-CD")]
+        [InlineData("as")]
+        [InlineData("es-BO")]
+        [InlineData("fr-CA")]
+        public void TestCurrencyNegativePatternLocale(string locale)
+        {
+            CultureInfo myTestCulture = new CultureInfo(locale);
+            NumberFormatInfo nfi = myTestCulture.NumberFormat;
+            int actual = nfi.CurrencyNegativePattern;
+
+            int[] acceptablePatterns = NumberFormatInfoData.GetCurrencyNegativePatterns(myTestCulture);
+            Assert.True(acceptablePatterns.Contains(actual),
+                string.Format("'{0}' was not found in '[{1}]'", actual, string.Join(",", acceptablePatterns)));
+        }
+
+        // TestCurrencyNegativePatternLocale2: Verify value of property CurrencyNegativePattern for specific locales
+        [Theory]
+        [InlineData("bg-BG", 8)]
+        public void TestCurrencyNegativePatternLocale2(string locale, int expected)
+        {
+            CultureInfo myTestCulture = new CultureInfo(locale);
+            NumberFormatInfo nfi = myTestCulture.NumberFormat;
+            int actual = nfi.CurrencyNegativePattern;
+            Assert.Equal(expected, actual);
+        }
 
         private void VerificationHelper<T>(int i) where T : Exception
         {

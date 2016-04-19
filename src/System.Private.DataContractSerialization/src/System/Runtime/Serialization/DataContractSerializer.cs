@@ -30,6 +30,7 @@ namespace System.Runtime.Serialization
         internal IList<Type> knownTypeList;
         internal DataContractDictionary knownDataContracts;
         private DataContractResolver _dataContractResolver;
+        private ISerializationSurrogateProvider _serializationSurrogateProvider;
         private bool _serializeReadOnlyTypes;
 
         public DataContractSerializer(Type type)
@@ -67,14 +68,12 @@ namespace System.Runtime.Serialization
 
 #if NET_NATIVE
         public DataContractSerializer(Type type, IEnumerable<Type> knownTypes, int maxItemsInObjectGraph, bool ignoreExtensionDataObject, bool preserveObjectReferences)
-#elif MERGE_DCJS
+#else
         internal DataContractSerializer(Type type, IEnumerable<Type> knownTypes, int maxItemsInObjectGraph, bool ignoreExtensionDataObject, bool preserveObjectReferences)
 #endif
-#if NET_NATIVE || MERGE_DCJS
         {
             Initialize(type, knownTypes, maxItemsInObjectGraph, ignoreExtensionDataObject, preserveObjectReferences, null, false);
         }
-#endif
 
         public DataContractSerializer(Type type, XmlDictionaryString rootName, XmlDictionaryString rootNamespace,
             IEnumerable<Type> knownTypes,
@@ -181,6 +180,11 @@ namespace System.Runtime.Serialization
             get { return _maxItemsInObjectGraph; }
         }
 
+        internal ISerializationSurrogateProvider SerializationSurrogateProvider
+        {
+            get { return _serializationSurrogateProvider; }
+            set { _serializationSurrogateProvider = value; }
+        }
 
         public bool PreserveObjectReferences
         {
@@ -208,7 +212,7 @@ namespace System.Runtime.Serialization
             {
                 if (_rootContract == null)
                 {
-                    _rootContract = DataContract.GetDataContract(_rootType);
+                    _rootContract = DataContract.GetDataContract((_serializationSurrogateProvider == null) ? _rootType : GetSurrogatedType(_serializationSurrogateProvider, _rootType));
                     _needsContractNsAtRoot = CheckIfNeedsContractNsAtRoot(_rootName, _rootNamespace, _rootContract);
                 }
                 return _rootContract;
@@ -306,6 +310,10 @@ namespace System.Runtime.Serialization
             Type declaredType = contract.UnderlyingType;
             Type graphType = (graph == null) ? declaredType : graph.GetType();
 
+            if (_serializationSurrogateProvider != null)
+            {
+                graph = SurrogateToDataContractType(_serializationSurrogateProvider, graph, declaredType, ref graphType);
+            }
 
             if (dataContractResolver == null)
                 dataContractResolver = this.DataContractResolver;
@@ -447,6 +455,21 @@ namespace System.Runtime.Serialization
         internal override Type GetDeserializeType()
         {
             return _rootType;
+        }
+
+        internal static object SurrogateToDataContractType(ISerializationSurrogateProvider serializationSurrogateProvider, object oldObj, Type surrogatedDeclaredType, ref Type objType)
+        {
+            object obj = DataContractSurrogateCaller.GetObjectToSerialize(serializationSurrogateProvider, oldObj, objType, surrogatedDeclaredType);
+            if (obj != oldObj)
+            {
+                objType = obj != null ? obj.GetType() : Globals.TypeOfObject;
+            }
+            return obj;
+        }
+
+        internal static Type GetSurrogatedType(ISerializationSurrogateProvider serializationSurrogateProvider, Type type)
+        {
+            return DataContractSurrogateCaller.GetDataContractType(serializationSurrogateProvider, DataContract.UnwrapNullableType(type));
         }
     }
 }

@@ -2,8 +2,15 @@
 <Project ToolsVersion="12.0" DefaultTargets="BuildAndTest" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="dir.props" />
 
+  <!-- required to build the projects in their specified order -->
+  <PropertyGroup>
+    <SerializeProjects>true</SerializeProjects>
+  </PropertyGroup>
+
   <ItemGroup>
     <Project Include="src\dirs.proj" />
+    <Project Include="src\packages.builds" />
+    <Project Include="src\post.msbuild" />
   </ItemGroup>
 
   <Import Project="dir.targets" />
@@ -12,6 +19,7 @@
 
   <PropertyGroup>
     <TraversalBuildDependsOn>
+      ValidateAllProjectDependencies;
       BatchRestorePackages;
       $(TraversalBuildDependsOn);
     </TraversalBuildDependsOn>
@@ -21,12 +29,39 @@
     <Message Importance="High" Text="Restoring all packages..." />
     <!-- restore all project.jsons in one pass for perf & to avoid concurrency problems with dnu -->
     <!-- include ToolsDir to restore test-runtime\project.json as well -->
-    <Exec Command="$(DnuRestoreCommand) $(DnuRestoreDirs)" StandardOutputImportance="Low" CustomErrorRegularExpression="^Unable to locate .*" />
+    <Exec Command="$(DnuRestoreCommand) &quot;%(DnuRestoreDir.Identity)&quot;" StandardOutputImportance="Low" CustomErrorRegularExpression="(^Unable to locate .*)|(^Updating the invalid lock file with .*)" ContinueOnError="WarnAndContinue" />
 
     <ItemGroup>
       <_allPackagesConfigs Include="$(MSBuildProjectDirectory)\src\**\packages.config"/>
     </ItemGroup>
     <Exec Condition="'@(_allPackagesConfigs)' != ''" Command="$(NugetRestoreCommand) &quot;%(_allPackagesConfigs.FullPath)&quot;" StandardOutputImportance="Low" />
+  </Target>
+
+  <!-- Task from buildtools that validates dependencies contained in project.json files. -->
+  <UsingTask TaskName="ValidateProjectDependencyVersions" AssemblyFile="$(BuildToolsTaskDir)Microsoft.DotNet.Build.Tasks.dll" />
+
+  <Target Name="ValidateAllProjectDependencies"
+          Condition="'$(ValidatePackageVersions)'=='true' and '@(ProjectJsonFiles)'!=''">
+    <ValidateProjectDependencyVersions ProjectJsons="@(ProjectJsonFiles)"
+                                       ProhibitFloatingDependencies="$(ProhibitFloatingDependencies)"
+                                       ValidationPatterns="@(ValidationPattern)" />
+  </Target>
+
+  <Target Name="UpdateInvalidPackageVersions">
+    <ValidateProjectDependencyVersions ProjectJsons="@(ProjectJsonFiles)"
+                                       ProhibitFloatingDependencies="$(ProhibitFloatingDependencies)"
+                                       ValidationPatterns="@(ValidationPattern)"
+                                       UpdateInvalidDependencies="true" />
+  </Target>
+
+  <!-- Tasks from buildtools for easy project.json dependency updates -->
+  <UsingTask TaskName="UpdatePackageDependencyVersion" AssemblyFile="$(BuildToolsTaskDir)Microsoft.DotNet.Build.Tasks.dll" />
+
+  <Target Name="UpdatePackageDependencyVersion">
+    <UpdatePackageDependencyVersion ProjectJsons="@(ProjectJsonFiles)"
+                                    PackageId="$(PackageId)"
+                                    OldVersion="$(OldVersion)"
+                                    NewVersion="$(NewVersion)" />
   </Target>
 
   <!-- Override RestorePackages from dir.traversal.targets and do a batch restore -->

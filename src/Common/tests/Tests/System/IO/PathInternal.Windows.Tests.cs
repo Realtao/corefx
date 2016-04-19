@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using System.Text;
 using Xunit;
 
 public class PathInternal_Windows_Tests
@@ -16,6 +17,10 @@ public class PathInternal_Windows_Tests
     [PlatformSpecific(PlatformID.Windows)]
     public void EnsureExtendedPrefixTest(string path, string expected)
     {
+        StringBuilder sb = new StringBuilder(path);
+        PathInternal.EnsureExtendedPrefix(sb);
+        Assert.Equal(expected, sb.ToString());
+
         Assert.Equal(expected, PathInternal.EnsureExtendedPrefix(path));
     }
 
@@ -41,6 +46,73 @@ public class PathInternal_Windows_Tests
     [PlatformSpecific(PlatformID.Windows)]
     public void IsRelativeTest(string path, bool expected)
     {
+        StringBuilder sb = new StringBuilder(path);
+        Assert.Equal(expected, PathInternal.IsRelative(sb));
+
         Assert.Equal(expected, PathInternal.IsRelative(path));
+    }
+
+    [Theory,
+        InlineData(@"", 0),
+        InlineData(@"  :", 0),
+        InlineData(@"  C:", 2),
+        InlineData(@"   C:\", 3),
+        InlineData(@"C:\", 0),
+        InlineData(@"  ", 0),
+        InlineData(@"  \", 2),
+        InlineData(@"  8:", 0),
+        InlineData(@"    \\", 4),
+        InlineData(@"\\", 0),
+        ]
+    [PlatformSpecific(PlatformID.Windows)]
+    public void PathStartSkipTest(string path, int expected)
+    {
+        Assert.Equal(expected, PathInternal.PathStartSkip(path));
+    }
+
+    [Theory,
+        InlineData(@"", @""),
+        InlineData(null, null),
+        InlineData(@"\", @"\"),
+        InlineData(@"/", @"\"),
+        InlineData(@"\\", @"\\"),
+        InlineData(@"\\\", @"\\"),
+        InlineData(@"//", @"\\"),
+        InlineData(@"///", @"\\"),
+        InlineData(@"\/", @"\\"),
+        InlineData(@"\/\", @"\\"),
+
+        InlineData(@"a\a", @"a\a"),
+        InlineData(@"a\\a", @"a\a"),
+        InlineData(@"a/a", @"a\a"),
+        InlineData(@"a//a", @"a\a"),
+        InlineData(@"a\", @"a\"),
+        InlineData(@"a\\", @"a\"),
+        InlineData(@"a/", @"a\"),
+        InlineData(@"a//", @"a\"),
+        InlineData(@"\a", @"\a"),
+        InlineData(@"\\a", @"\\a"),
+        InlineData(@"/a", @"\a"),
+        InlineData(@"//a", @"\\a"),
+
+        // Skip tests
+        InlineData(@"  :", @"  :"),
+        InlineData(@"  C:", @"C:"),
+        InlineData(@"   C:\", @"C:\"),
+        InlineData(@"   C:/", @"C:\"),
+        InlineData(@"  ", @"  "),
+        InlineData(@"  \", @"\"),
+        InlineData(@"  /", @"\"),
+        InlineData(@"  8:", @"  8:"),
+        InlineData(@"    \\", @"\\"),
+        InlineData(@"    //", @"\\"),
+        ]
+    [PlatformSpecific(PlatformID.Windows)]
+    public void NormalizeDirectorySeparatorTests(string path, string expected)
+    {
+        string result = PathInternal.NormalizeDirectorySeparators(path);
+        Assert.Equal(expected, result);
+        if (string.Equals(path, expected, StringComparison.Ordinal))
+            Assert.Same(path, result);
     }
 }

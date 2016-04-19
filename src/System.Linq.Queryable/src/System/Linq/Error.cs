@@ -20,16 +20,6 @@ namespace System.Linq
             return new ArgumentException(Strings.ArgumentNotValid(message));
         }
 
-        internal static Exception UnhandledExpressionType(object message)
-        {
-            return new ArgumentException(Strings.UnhandledExpressionType(message));
-        }
-
-        internal static Exception UnhandledBindingType(object message)
-        {
-            return new ArgumentException(Strings.UnhandledBindingType(message));
-        }
-
         internal static Exception ArgumentOutOfRange(string message)
         {
             return new ArgumentOutOfRangeException(message);
@@ -43,6 +33,11 @@ namespace System.Linq
         internal static Exception NoMethodOnTypeMatchingArguments(string name, object type)
         {
             return new InvalidOperationException(Strings.NoMethodOnTypeMatchingArguments(name, type));
+        }
+
+        internal static Exception EnumeratingNullEnumerableExpression()
+        {
+            return new InvalidOperationException(Strings.EnumeratingNullEnumerableExpression());
         }
     }
 }

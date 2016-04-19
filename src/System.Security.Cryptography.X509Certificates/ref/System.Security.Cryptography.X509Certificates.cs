@@ -15,6 +15,11 @@ namespace Microsoft.Win32.SafeHandles
 }
 namespace System.Security.Cryptography.X509Certificates
 {
+    public static partial class ECDsaCertificateExtensions
+    {
+        public static System.Security.Cryptography.ECDsa GetECDsaPrivateKey(this System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { return default(System.Security.Cryptography.ECDsa); }
+        public static System.Security.Cryptography.ECDsa GetECDsaPublicKey(this System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { return default(System.Security.Cryptography.ECDsa); }
+    }
     [System.FlagsAttribute]
     public enum OpenFlags
     {
@@ -273,10 +278,13 @@ namespace System.Security.Cryptography.X509Certificates
         CtlNotTimeValid = 131072,
         CtlNotValidForUsage = 524288,
         Cyclic = 128,
+        ExplicitDistrust = 67108864,
         HasExcludedNameConstraint = 32768,
         HasNotDefinedNameConstraint = 8192,
         HasNotPermittedNameConstraint = 16384,
+        HasNotSupportedCriticalExtension = 134217728,
         HasNotSupportedNameConstraint = 4096,
+        HasWeakSignature = 1048576,
         InvalidBasicConstraints = 1024,
         InvalidExtension = 256,
         InvalidNameConstraints = 2048,

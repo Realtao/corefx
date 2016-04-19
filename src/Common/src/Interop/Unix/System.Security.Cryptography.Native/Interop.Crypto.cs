@@ -2,8 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
-
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.Win32.SafeHandles;
 
 internal static partial class Interop
@@ -34,6 +36,9 @@ internal static partial class Interop
         internal static extern IntPtr GetX509NotAfter(SafeX509Handle x509);
 
         [DllImport(Libraries.CryptoNative)]
+        internal static extern IntPtr GetX509CrlNextUpdate(SafeX509CrlHandle crl);
+
+        [DllImport(Libraries.CryptoNative)]
         internal static extern int GetX509Version(SafeX509Handle x509);
 
         [DllImport(Libraries.CryptoNative)]
@@ -61,43 +66,16 @@ internal static partial class Interop
         private static extern int GetAsn1StringBytes(IntPtr asn1, byte[] buf, int cBuf);
 
         [DllImport(Libraries.CryptoNative)]
-        internal static extern SafeX509StackHandle NewX509Stack();
-
-        [DllImport(Libraries.CryptoNative)]
-        internal static extern int GetX509StackFieldCount(SafeX509StackHandle stack);
-
-        [DllImport(Libraries.CryptoNative)]
-        internal static extern int GetX509StackFieldCount(SafeSharedX509StackHandle stack);
-
-        /// <summary>
-        /// Gets a pointer to a certificate within a STACK_OF(X509). This pointer will later
-        /// be freed, so it should be cloned via new X509Certificate2(IntPtr)
-        /// </summary>
-        [DllImport(Libraries.CryptoNative)]
-        internal static extern IntPtr GetX509StackField(SafeX509StackHandle stack, int loc);
-
-        /// <summary>
-        /// Gets a pointer to a certificate within a STACK_OF(X509). This pointer will later
-        /// be freed, so it should be cloned via new X509Certificate2(IntPtr)
-        /// </summary>
-        [DllImport(Libraries.CryptoNative)]
-        internal static extern IntPtr GetX509StackField(SafeSharedX509StackHandle stack, int loc);
-
-        [DllImport(Libraries.CryptoNative)]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool PushX509StackField(SafeX509StackHandle stack, SafeX509Handle x509);
 
-        [DllImport(Libraries.CryptoNative)]
-        internal static extern void RecursiveFreeX509Stack(IntPtr stack);
+        internal static string GetX509RootStorePath()
+        {
+            return Marshal.PtrToStringAnsi(GetX509RootStorePath_private());
+        }
 
-        [DllImport(Libraries.CryptoNative, CharSet = CharSet.Ansi)]
-        internal static extern string GetX509RootStorePath();
-
-        [DllImport(Libraries.CryptoNative)]
-        internal static extern int UpRefEvpPkey(SafeEvpPkeyHandle handle);
-
-        [DllImport(Libraries.CryptoNative)]
-        private static extern int GetPkcs7Certificates(SafePkcs7Handle p7, out SafeSharedX509StackHandle certs);
+        [DllImport(Libraries.CryptoNative, EntryPoint = "GetX509RootStorePath")]
+        private static extern IntPtr GetX509RootStorePath_private();
 
         [DllImport(Libraries.CryptoNative)]
         private static extern int SetX509ChainVerifyTime(
@@ -110,6 +88,12 @@ internal static partial class Interop
             int second,
             [MarshalAs(UnmanagedType.Bool)] bool isDst);
 
+        [DllImport(Libraries.CryptoNative)]
+        internal static extern int CheckX509IpAddress(SafeX509Handle x509, [In]byte[] addressBytes, int addressLen, string hostname, int cchHostname);
+
+        [DllImport(Libraries.CryptoNative)]
+        internal static extern int CheckX509Hostname(SafeX509Handle x509, string hostname, int cchHostname);
+
         internal static byte[] GetAsn1StringBytes(IntPtr asn1)
         {
             return GetDynamicBuffer((ptr, buf, i) => GetAsn1StringBytes(ptr, buf, i), asn1);
@@ -120,9 +104,12 @@ internal static partial class Interop
             return GetDynamicBuffer((handle, buf, i) => GetX509Thumbprint(handle, buf, i), x509);
         }
 
-        internal static byte[] GetX509NameRawBytes(IntPtr x509Name)
+        internal static X500DistinguishedName LoadX500Name(IntPtr namePtr)
         {
-            return GetDynamicBuffer((ptr, buf, i) => GetX509NameRawBytes(ptr, buf, i), x509Name);
+            CheckValidOpenSslHandle(namePtr);
+
+            byte[] buf = GetDynamicBuffer((ptr, buf1, i) => GetX509NameRawBytes(ptr, buf1, i), namePtr);
+            return new X500DistinguishedName(buf);
         }
 
         internal static byte[] GetX509PublicKeyParameterBytes(SafeX509Handle x509)
@@ -132,12 +119,10 @@ internal static partial class Interop
 
         internal static void SetX509ChainVerifyTime(SafeX509StoreCtxHandle ctx, DateTime verifyTime)
         {
-            // Let Unspecified mean Local, so only convert if the source was UTC.
-            if (verifyTime.Kind == DateTimeKind.Utc)
-            {
-                verifyTime = verifyTime.ToLocalTime();
-            }
-
+            // OpenSSL is going to convert our input time to universal, so we should be in Local or
+            // Unspecified (local-assumed).
+            Debug.Assert(verifyTime.Kind != DateTimeKind.Utc, "UTC verifyTime should have been normalized to Local");
+            
             int succeeded = SetX509ChainVerifyTime(
                 ctx,
                 verifyTime.Year,
@@ -150,29 +135,8 @@ internal static partial class Interop
 
             if (succeeded != 1)
             {
-                throw Interop.libcrypto.CreateOpenSslCryptographicException();
+                throw Interop.Crypto.CreateOpenSslCryptographicException();
             }
-        }
-
-        internal static SafeSharedX509StackHandle GetPkcs7Certificates(SafePkcs7Handle p7)
-        {
-            if (p7 == null || p7.IsInvalid)
-            {
-                return SafeSharedX509StackHandle.InvalidHandle;
-            }
-
-            SafeSharedX509StackHandle certs;
-            int result = GetPkcs7Certificates(p7, out certs);
-
-            if (result != 1)
-            {
-                throw Interop.libcrypto.CreateOpenSslCryptographicException();
-            }
-
-            // Track the parent relationship for the interior pointer so lifetime is well-managed.
-            certs.SetParent(p7);
-
-            return certs;
         }
 
         private static byte[] GetDynamicBuffer<THandle>(NegativeSizeReadMethod<THandle> method, THandle handle)
@@ -181,7 +145,7 @@ internal static partial class Interop
 
             if (negativeSize > 0)
             {
-                throw Interop.libcrypto.CreateOpenSslCryptographicException();
+                throw Interop.Crypto.CreateOpenSslCryptographicException();
             }
 
             byte[] bytes = new byte[-negativeSize];
@@ -190,7 +154,7 @@ internal static partial class Interop
 
             if (ret != 1)
             {
-                throw Interop.libcrypto.CreateOpenSslCryptographicException();
+                throw Interop.Crypto.CreateOpenSslCryptographicException();
             }
 
             return bytes;

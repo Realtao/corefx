@@ -4,6 +4,7 @@
 using System;
 using System.IO;
 using System.Text;
+
 using Xunit;
 
 public partial class PathTooLongException_40100_Tests
@@ -47,11 +48,9 @@ public partial class PathTooLongException_40100_Tests
             while (true)
             {
                 path = sb.ToString();
-                Path.GetPathRoot(path); // will eventually throw when path is too long
+                Path.GetFullPath(path); // will eventually throw when path is too long
                 sb.Append(path); // double the number of directories for the next time
             }
         }));
-        Assert.Throws<PathTooLongException>(() => Path.GetFullPath(path));
-        Assert.Throws<PathTooLongException>(() => Path.GetDirectoryName(path));
     }
 }

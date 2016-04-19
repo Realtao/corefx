@@ -5,9 +5,10 @@ using Microsoft.Win32.SafeHandles;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Xunit;
 
-namespace System.IO.FileSystem.Tests
+namespace System.IO.Tests
 {
     public class FileStream_SafeFileHandle : FileSystemTest
     {
@@ -58,7 +59,7 @@ namespace System.IO.FileSystem.Tests
         }
 
         [Fact]
-        public void ThrowWhenHandlePositionIsChanged()
+        public async Task ThrowWhenHandlePositionIsChanged()
         {
             string fileName = GetTestFilePath();
 
@@ -98,7 +99,7 @@ namespace System.IO.FileSystem.Tests
                     }
                     else
                     {
-                        Assert.ThrowsAsync<IOException>(() => fs.ReadAsync(new byte[1], 0, 1)).Wait();
+                        await Assert.ThrowsAsync<IOException>(() => fs.ReadAsync(new byte[1], 0, 1));
                     }
 
                     fs.WriteByte(0);

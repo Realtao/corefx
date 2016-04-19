@@ -145,7 +145,7 @@ namespace System.IO
                 if (newMode != _fileStatus.Mode)
                 {
                     bool isDirectory = this is DirectoryInfo;
-                    while (Interop.CheckIo(Interop.Sys.ChMod(FullPath, newMode), FullPath, isDirectory)) ;
+                    Interop.CheckIo(Interop.Sys.ChMod(FullPath, newMode), FullPath, isDirectory);
                 }
             }
         }
@@ -170,7 +170,7 @@ namespace System.IO
             {
                 EnsureStatInitialized();
                 return (_fileStatus.Flags & Interop.Sys.FileStatusFlags.HasBirthTime) != 0 ?
-                    DateTimeOffset.FromUnixTimeSeconds(_fileStatus.BirthTime) :
+                    DateTimeOffset.FromUnixTimeSeconds(_fileStatus.BirthTime).ToLocalTime() :
                     default(DateTimeOffset);
             }
             set
@@ -190,7 +190,7 @@ namespace System.IO
                 EnsureStatInitialized();
                 return DateTimeOffset.FromUnixTimeSeconds(_fileStatus.ATime).ToLocalTime();
             }
-            set { SetAccessWriteTimes((IntPtr)value.ToUnixTimeSeconds(), null); }
+            set { SetAccessWriteTimes(value.ToUnixTimeSeconds(), null); }
         }
 
         DateTimeOffset IFileSystemObject.LastWriteTime
@@ -200,18 +200,18 @@ namespace System.IO
                 EnsureStatInitialized();
                 return DateTimeOffset.FromUnixTimeSeconds(_fileStatus.MTime).ToLocalTime();
             }
-            set { SetAccessWriteTimes(null, (IntPtr)value.ToUnixTimeSeconds()); }
+            set { SetAccessWriteTimes(null, value.ToUnixTimeSeconds()); }
         }
 
-        private void SetAccessWriteTimes(IntPtr? accessTime, IntPtr? writeTime)
+        private void SetAccessWriteTimes(long? accessTime, long? writeTime)
         {
             _fileStatusInitialized = -1; // force a refresh so that we have an up-to-date times for values not being overwritten
             EnsureStatInitialized();
-            Interop.libc.utimbuf buf;
-            buf.actime = accessTime ?? new IntPtr(_fileStatus.ATime);
-            buf.modtime = writeTime ?? new IntPtr(_fileStatus.MTime);
+            Interop.Sys.UTimBuf buf;
+            buf.AcTime = accessTime ?? _fileStatus.ATime;
+            buf.ModTime = writeTime ?? _fileStatus.MTime;
             bool isDirectory = this is DirectoryInfo;
-            while (Interop.CheckIo(Interop.libc.utime(FullPath, ref buf), FullPath, isDirectory)) ;
+            Interop.CheckIo(Interop.Sys.UTime(FullPath, ref buf), FullPath, isDirectory);
             _fileStatusInitialized = -1;
         }
 
@@ -228,24 +228,15 @@ namespace System.IO
         {
             // This should not throw, instead we store the result so that we can throw it
             // when someone actually accesses a property.
-            int result;
-            while (true)
+            int result = Interop.Sys.Stat(FullPath, out _fileStatus);
+            if (result >= 0)
             {
-                result = Interop.Sys.Stat(FullPath, out _fileStatus);
-                if (result >= 0)
-                {
-                    _fileStatusInitialized = 0;
-                }
-                else
-                {
-                    var errorInfo = Interop.Sys.GetLastErrorInfo();
-                    if (errorInfo.Error == Interop.Error.EINTR)
-                    {
-                        continue;
-                    }
-                    _fileStatusInitialized = errorInfo.RawErrno;
-                }
-                break;
+                _fileStatusInitialized = 0;
+            }
+            else
+            {
+                var errorInfo = Interop.Sys.GetLastErrorInfo();
+                _fileStatusInitialized = errorInfo.RawErrno;
             }
         }
 

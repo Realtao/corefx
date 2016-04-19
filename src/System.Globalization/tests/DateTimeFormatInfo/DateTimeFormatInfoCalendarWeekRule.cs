@@ -3,13 +3,14 @@
 
 using System;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Xunit;
 
 namespace System.Globalization.Tests
 {
     public class DateTimeFormatInfoCalendarWeekRule
     {
-        // PosTest1: Call CalendarWeekRule getter method should return correct value for InvariantInfo
+        // TestGetter: Call CalendarWeekRule getter method should return correct value for InvariantInfo
         [Fact]
         public void TestGetter()
         {
@@ -18,13 +19,13 @@ namespace System.Globalization.Tests
                     false);
         }
 
-        // PosTest2: Call CalendarWeekRule setter method should return correct value
+        // TestSetter: Call CalendarWeekRule setter method should return correct value
         [Fact]
         public void TestSetter()
         {
             VerificationHelper(new DateTimeFormatInfo(),
-                    CalendarWeekRule.FirstDay,
-                    true);
+                CalendarWeekRule.FirstDay,
+                true);
             VerificationHelper(new DateTimeFormatInfo(),
                 CalendarWeekRule.FirstFourDayWeek,
                 true);
@@ -33,7 +34,7 @@ namespace System.Globalization.Tests
                 true);
         }
 
-        // NegTest1: ArgumentOutOfRangeException should be thrown when The property is being set to a value that is 
+        // TestInvalidValue: ArgumentOutOfRangeException should be thrown when The property is being set to a value that is 
         // not a valid CalendarWeekRule value
         [Fact]
         public void TestInvalidValue()
@@ -42,6 +43,20 @@ namespace System.Globalization.Tests
             {
                 new DateTimeFormatInfo().CalendarWeekRule = (CalendarWeekRule)(-1);
             });
+        }
+
+        // Verify value of property CalendarWeekRule for specific locales
+        [Theory]
+        [InlineData("en-US")]
+        [InlineData("br-FR")]
+        public void TestLocale(string localeName)
+        {
+            CultureInfo myTestCulture = new CultureInfo(localeName);
+            DateTimeFormatInfo dti = myTestCulture.DateTimeFormat;
+            CalendarWeekRule actual = dti.CalendarWeekRule;
+
+            CalendarWeekRule expected = DateTimeFormatInfoData.GetCalendarWeekRule(myTestCulture);
+            Assert.Equal(expected, actual);
         }
 
         private void VerificationHelper(DateTimeFormatInfo info, CalendarWeekRule expected, bool setter)

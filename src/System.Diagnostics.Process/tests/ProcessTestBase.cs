@@ -4,17 +4,17 @@
 using System.Collections.Generic;
 using System.Threading;
 
-namespace System.Diagnostics.ProcessTests
+namespace System.Diagnostics.Tests
 {
     public class ProcessTestBase : RemoteExecutorTestBase
     {
-        protected const int WaitInMS = 100 * 1000;
+        protected const int WaitInMS = 600 * 1000;
         protected readonly Process _process;
         protected readonly List<Process> _processes = new List<Process>();
 
         public ProcessTestBase()
         {
-            _process = CreateProcessInfinite();
+            _process = CreateProcessLong();
             _process.Start();
         }
 
@@ -33,6 +33,8 @@ namespace System.Diagnostics.ProcessTests
                 }
                 catch (InvalidOperationException) { } // in case it was never started
             }
+
+            base.Dispose(disposing);
         }
 
         protected Process CreateProcess(Func<int> method = null)
@@ -55,7 +57,7 @@ namespace System.Diagnostics.ProcessTests
             return p;
         }
 
-        protected Process CreateProcessInfinite()
+        protected Process CreateProcessLong()
         {
             return CreateProcess(() =>
             {

@@ -44,7 +44,7 @@ namespace Internal.Cryptography.Pal
                         IntPtr.Zero,
                         IntPtr.Zero))
                     {
-                        throw new CryptographicException(Marshal.GetLastWin32Error());
+                        throw Marshal.GetLastWin32Error().ToCryptographicException();
                     }
                 }
             }
@@ -52,7 +52,7 @@ namespace Internal.Cryptography.Pal
             return MapContentType(contentType);
         }
 
-        public X509ContentType GetCertContentType(String fileName)
+        public X509ContentType GetCertContentType(string fileName)
         {
             ContentType contentType;
 
@@ -73,7 +73,7 @@ namespace Internal.Cryptography.Pal
                         IntPtr.Zero,
                         IntPtr.Zero))
                     {
-                        throw new CryptographicException(Marshal.GetLastWin32Error());
+                        throw Marshal.GetLastWin32Error().ToCryptographicException();
                     }
                 }
             }

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.props))\dir.props" />
   <PropertyGroup>
@@ -8,8 +8,9 @@
     <OutputType>Library</OutputType>
     <AssemblyName>System.Text.Encoding.Tests</AssemblyName>
     <RootNamespace>System.Text.Encoding.Tests</RootNamespace>
+    <IncludePerformanceTests>true</IncludePerformanceTests>
   </PropertyGroup>
-   <!-- Default configurations to help VS understand the configurations -->
+  <!-- Default configurations to help VS understand the configurations -->
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -116,6 +117,11 @@
     <Compile Include="UTF8Encoding\UTF8EncodingGetPreamble.cs" />
     <Compile Include="UTF8Encoding\UTF8EncodingGetString.cs" />
     <Compile Include="$(CommonTestPath)\System\RandomDataGenerator.cs" />
+    <!-- Performance Tests -->
+    <Compile Include="Performance\Perf.Encoding.cs" />
+    <Compile Include="$(CommonTestPath)\System\PerfUtils.cs">
+      <Link>Common\System\PerfUtils.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />

@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Xunit;
 
-namespace System.Diagnostics.ProcessTests
+namespace System.Diagnostics.Tests
 {
     public class ProcessStandardConsoleTests : ProcessTestBase
     {
@@ -16,7 +16,7 @@ namespace System.Diagnostics.ProcessTests
         {
             Action<int> run = expectedCodePage =>
             {
-                Process p = CreateProcessInfinite();
+                Process p = CreateProcessLong();
                 p.StartInfo.RedirectStandardInput = true;
                 p.StartInfo.RedirectStandardOutput = true;
                 p.StartInfo.RedirectStandardError = true;

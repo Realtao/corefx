@@ -27,31 +27,44 @@ namespace Internal.Cryptography.Pal
             DateTime verificationTime,
             TimeSpan timeout)
         {
-            CheckRevocationMode(revocationMode);
-
             // An input value of 0 on the timeout is "take all the time you need".
             if (timeout == TimeSpan.Zero)
             {
                 timeout = TimeSpan.MaxValue;
             }
 
+            // Let Unspecified mean Local, so only convert if the source was UTC.
+            //
+            // Converge on Local instead of UTC because OpenSSL is going to assume we gave it
+            // local time.
+            if (verificationTime.Kind == DateTimeKind.Utc)
+            {
+                verificationTime = verificationTime.ToLocalTime();
+            }
+
             TimeSpan remainingDownloadTime = timeout;
             X509Certificate2 leaf = new X509Certificate2(cert.Handle);
             List<X509Certificate2> downloaded = new List<X509Certificate2>();
+            List<X509Certificate2> systemTrusted = new List<X509Certificate2>();
 
             List<X509Certificate2> candidates = OpenSslX509ChainProcessor.FindCandidates(
                 leaf,
                 extraStore,
                 downloaded,
+                systemTrusted,
                 ref remainingDownloadTime);
 
             IChainPal chain = OpenSslX509ChainProcessor.BuildChain(
                 leaf,
                 candidates,
                 downloaded,
+                systemTrusted,
                 applicationPolicy,
                 certificatePolicy,
-                verificationTime);
+                revocationMode,
+                revocationFlag,
+                verificationTime,
+                ref remainingDownloadTime);
 
             if (chain.ChainStatus.Length == 0 && downloaded.Count > 0)
             {
@@ -59,15 +72,6 @@ namespace Internal.Cryptography.Pal
             }
 
             return chain;
-        }
-
-        private static void CheckRevocationMode(X509RevocationMode revocationMode)
-        {
-            if (revocationMode != X509RevocationMode.NoCheck)
-            {
-                // TODO (#2203): Add support for revocation once networking is ready.
-                throw new NotImplementedException(SR.WorkInProgress);
-            }
         }
 
         private static void SaveIntermediateCertificates(

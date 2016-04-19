@@ -69,7 +69,9 @@ namespace System.Diagnostics
 
             ~Holder()
             {
-                if (_state != null)
+                // Don't try to Dispose resources (like ManualResetEvents) if 
+                // the process is shutting down.
+                if (_state != null && !Environment.HasShutdownStarted)
                 {
                     _state.ReleaseRef();
                 }
@@ -79,9 +81,9 @@ namespace System.Diagnostics
             {
                 if (_state != null)
                 {
+                    GC.SuppressFinalize(this);
                     _state.ReleaseRef();
                     _state = null;
-                    GC.SuppressFinalize(this);
                 }
             }
         }
@@ -119,9 +121,9 @@ namespace System.Diagnostics
         /// </summary>
         internal void ReleaseRef()
         {
+            ProcessWaitState pws;
             lock (ProcessWaitState.s_processWaitStates)
             {
-                ProcessWaitState pws;
                 bool foundState = ProcessWaitState.s_processWaitStates.TryGetValue(_processId, out pws);
                 Debug.Assert(foundState);
                 if (foundState)
@@ -129,10 +131,17 @@ namespace System.Diagnostics
                     --pws._outstandingRefCount;
                     if (pws._outstandingRefCount == 0)
                     {
-                        ProcessWaitState.s_processWaitStates.Remove(_processId);
-                        pws.Dispose();
+                        s_processWaitStates.Remove(_processId);
+                    }
+                    else
+                    {
+                        pws = null;
                     }
                 }
+            }
+            if (pws != null)
+            {
+                pws.Dispose();
             }
         }
 
@@ -283,82 +292,73 @@ namespace System.Diagnostics
             Debug.Assert(Monitor.IsEntered(_gate));
             Debug.Assert(!blockingAllowed); // see "PERF NOTE" comment in WaitForExit
 
-            while (true) // in case of EINTR during system call
+            // Try to get the state of the (child) process
+            int status;
+            int waitResult = Interop.Sys.WaitPid(_processId, out status,
+                blockingAllowed ? Interop.Sys.WaitPidOptions.None : Interop.Sys.WaitPidOptions.WNOHANG);
+
+            if (waitResult == _processId)
             {
-                // Try to get the state of the (child) process
-                int status;
-                int waitResult = Interop.libc.waitpid(_processId, out status,
-                    blockingAllowed ? Interop.libc.WaitPidOptions.None : Interop.libc.WaitPidOptions.WNOHANG);
-
-                if (waitResult == _processId)
+                // Process has exited
+                if (Interop.Sys.WIfExited(status))
                 {
-                    // Process has exited
-                    if (Interop.libc.WIFEXITED(status))
-                    {
-                        _exitCode = Interop.libc.WEXITSTATUS(status);
-                    }
-                    else if (Interop.libc.WIFSIGNALED(status))
-                    {
-                        const int ExitCodeSignalOffset = 128;
-                        _exitCode = ExitCodeSignalOffset + Interop.libc.WTERMSIG(status);
-                    }
-                    SetExited();
-                    return;
+                    _exitCode = Interop.Sys.WExitStatus(status);
                 }
-                else if (waitResult == 0)
+                else if (Interop.Sys.WIfSignaled(status))
                 {
-                    // Process is still running
-                    return;
+                    const int ExitCodeSignalOffset = 128;
+                    _exitCode = ExitCodeSignalOffset + Interop.Sys.WTermSig(status);
                 }
-                else if (waitResult == -1)
-                {
-                    // Something went wrong, e.g. it's not a child process,
-                    // or waitpid was already called for this child, or
-                    // that the call was interrupted by a signal.
-                    Interop.Error errno = Interop.Sys.GetLastError();
-                    if (errno == Interop.Error.EINTR)
-                    {
-                        // waitpid was interrupted. Try again.
-                        continue;
-                    }
-                    else if (errno == Interop.Error.ECHILD)
-                    {
-                        // waitpid was used with a non-child process.  We won't be
-                        // able to get an exit code, but we'll at least be able 
-                        // to determine if the process is still running (assuming
-                        // there's not a race on its id).
-                        int killResult = Interop.libc.kill(_processId, 0); // 0 means don't send a signal
-                        if (killResult == 0)
-                        {
-                            // Process is still running.  This could also be a defunct process that has completed
-                            // its work but still has an entry in the processes table due to its parent not yet
-                            // having waited on it to clean it up.
-                            return;
-                        }
-                        else // error from kill
-                        {
-                            errno = Interop.Sys.GetLastError();
-                            if (errno == Interop.Error.ESRCH)
-                            {
-                                // Couldn't find the process; assume it's exited
-                                SetExited();
-                                return;
-                            }
-                            else if (errno == Interop.Error.EPERM)
-                            {
-                                // Don't have permissions to the process; assume it's alive
-                                return;
-                            }
-                            else Debug.Fail("Unexpected errno value from kill");
-                        }
-                    }
-                    else Debug.Fail("Unexpected errno value from waitpid");
-                }
-                else Debug.Fail("Unexpected process ID from waitpid.");
-
                 SetExited();
                 return;
             }
+            else if (waitResult == 0)
+            {
+                // Process is still running
+                return;
+            }
+            else if (waitResult == -1)
+            {
+                // Something went wrong, e.g. it's not a child process,
+                // or waitpid was already called for this child, or
+                // that the call was interrupted by a signal.
+                Interop.Error errno = Interop.Sys.GetLastError();
+                if (errno == Interop.Error.ECHILD)
+                {
+                    // waitpid was used with a non-child process.  We won't be
+                    // able to get an exit code, but we'll at least be able 
+                    // to determine if the process is still running (assuming
+                    // there's not a race on its id).
+                    int killResult = Interop.Sys.Kill(_processId, Interop.Sys.Signals.None); // None means don't send a signal
+                    if (killResult == 0)
+                    {
+                        // Process is still running.  This could also be a defunct process that has completed
+                        // its work but still has an entry in the processes table due to its parent not yet
+                        // having waited on it to clean it up.
+                        return;
+                    }
+                    else // error from kill
+                    {
+                        errno = Interop.Sys.GetLastError();
+                        if (errno == Interop.Error.ESRCH)
+                        {
+                            // Couldn't find the process; assume it's exited
+                            SetExited();
+                            return;
+                        }
+                        else if (errno == Interop.Error.EPERM)
+                        {
+                            // Don't have permissions to the process; assume it's alive
+                            return;
+                        }
+                        else Debug.Fail("Unexpected errno value from kill");
+                    }
+                }
+                else Debug.Fail("Unexpected errno value from waitpid");
+            }
+            else Debug.Fail("Unexpected process ID from waitpid.");
+
+            SetExited();
         }
 
         /// <summary>Waits for the associated process to exit.</summary>

@@ -23,6 +23,7 @@ Project Docs
 ============
 
 - [Developer Guide](project-docs/developer-guide.md)
+- [Performance Testing](project-docs/performance-tests.md)
 - [Project priorities](https://github.com/dotnet/coreclr/blob/master/Documentation/project-docs/project-priorities.md)
 - [Contributing to CoreFX](project-docs/contributing.md)
 - [Contributing to .NET Core](https://github.com/dotnet/coreclr/blob/master/Documentation/project-docs/contributing.md)
@@ -33,6 +34,7 @@ Project Docs
 - [Strong Name Signing](project-docs/strong-name-signing.md)
 - [Open Source Signing](project-docs/oss-signing.md)
 - [Repo Organization](project-docs/repo-organization.md)
+- [Project NuGet Dependencies](project-docs/project-nuget-dependencies.md)
 
 Coding Guidelines
 =================

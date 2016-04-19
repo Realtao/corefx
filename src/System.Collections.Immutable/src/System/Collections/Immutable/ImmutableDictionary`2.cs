@@ -5,8 +5,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
-using Validation;
-using BCL = System.Collections.Generic;
 
 namespace System.Collections.Immutable
 {
@@ -306,7 +304,7 @@ namespace System.Collections.Immutable
             Requires.NotNullAllowStructs(key, "key");
             Contract.Ensures(Contract.Result<ImmutableDictionary<TKey, TValue>>() != null);
 
-            var result = Add(key, value, KeyCollisionBehavior.ThrowIfValueDifferent, new MutationInput(this));
+            var result = Add(key, value, KeyCollisionBehavior.ThrowIfValueDifferent, this.Origin);
             return result.Finalize(this);
         }
 
@@ -333,7 +331,7 @@ namespace System.Collections.Immutable
             Contract.Ensures(Contract.Result<ImmutableDictionary<TKey, TValue>>() != null);
             Contract.Ensures(!Contract.Result<ImmutableDictionary<TKey, TValue>>().IsEmpty);
 
-            var result = Add(key, value, KeyCollisionBehavior.SetValue, new MutationInput(this));
+            var result = Add(key, value, KeyCollisionBehavior.SetValue, this.Origin);
             return result.Finalize(this);
         }
 
@@ -362,7 +360,7 @@ namespace System.Collections.Immutable
             Requires.NotNullAllowStructs(key, "key");
             Contract.Ensures(Contract.Result<ImmutableDictionary<TKey, TValue>>() != null);
 
-            var result = Remove(key, new MutationInput(this));
+            var result = Remove(key, this.Origin);
             return result.Finalize(this);
         }
 
@@ -406,7 +404,7 @@ namespace System.Collections.Immutable
         public bool ContainsKey(TKey key)
         {
             Requires.NotNullAllowStructs(key, "key");
-            return ContainsKey(key, new MutationInput(this));
+            return ContainsKey(key, this.Origin);
         }
 
         /// <summary>
@@ -738,7 +736,6 @@ namespace System.Collections.Immutable
         /// <returns>
         /// An <see cref="IDictionaryEnumerator"/> object for the <see cref="IDictionary"/> object.
         /// </returns>
-        /// <exception cref="System.NotImplementedException"></exception>
         IDictionaryEnumerator IDictionary.GetEnumerator()
         {
             return new DictionaryEnumerator<TKey, TValue>(this.GetEnumerator());

@@ -5,25 +5,28 @@ using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
+
 using Xunit;
 
 public static class TimeZoneInfoTests
 {
     private static readonly bool s_isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-    private static String s_strPacific = s_isWindows ? "Pacific Standard Time" : "America/Los_Angeles";
-    private static String s_strSydney = s_isWindows ? "AUS Eastern Standard Time" : "Australia/Sydney";
-    private static String s_strGMT = s_isWindows ? "GMT Standard Time" : "Europe/London";
-    private static String s_strTonga = s_isWindows ? "Tonga Standard Time" : "Pacific/Tongatapu";
-    private static String s_strBrasil = s_isWindows ? "E. South America Standard Time" : "America/Sao_Paulo";
-    private static String s_strPerth = s_isWindows ? "W. Australia Standard Time" : "Australia/Perth";
-    private static String s_strBrasilia = s_isWindows ? "E. South America Standard Time" : "America/Sao_Paulo";
-    private static String s_strNairobi = s_isWindows ? "E. Africa Standard Time" : "Africa/Nairobi";
-    private static String s_strAmsterdam = s_isWindows ? "W. Europe Standard Time" : "Europe/Berlin";
-    private static String s_strRussian = s_isWindows ? "Russian Standard Time" : "Europe/Moscow";
-    private static String s_strLibya = s_isWindows ? "Libya Standard Time" : "Africa/Tripoli";
-    private static String s_strCatamarca = s_isWindows ? "Argentina Standard Time" : "America/Argentina/Catamarca";
-    private static String s_strLisbon = s_isWindows ? "GMT Standard Time" : "Europe/Lisbon";
-    private static String s_strNewfoundland = s_isWindows ? "Newfoundland Standard Time" : "America/St_Johns";
+    private static readonly bool s_isOSX = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+
+    private static string s_strPacific = s_isWindows ? "Pacific Standard Time" : "America/Los_Angeles";
+    private static string s_strSydney = s_isWindows ? "AUS Eastern Standard Time" : "Australia/Sydney";
+    private static string s_strGMT = s_isWindows ? "GMT Standard Time" : "Europe/London";
+    private static string s_strTonga = s_isWindows ? "Tonga Standard Time" : "Pacific/Tongatapu";
+    private static string s_strBrasil = s_isWindows ? "E. South America Standard Time" : "America/Sao_Paulo";
+    private static string s_strPerth = s_isWindows ? "W. Australia Standard Time" : "Australia/Perth";
+    private static string s_strBrasilia = s_isWindows ? "E. South America Standard Time" : "America/Sao_Paulo";
+    private static string s_strNairobi = s_isWindows ? "E. Africa Standard Time" : "Africa/Nairobi";
+    private static string s_strAmsterdam = s_isWindows ? "W. Europe Standard Time" : "Europe/Berlin";
+    private static string s_strRussian = s_isWindows ? "Russian Standard Time" : "Europe/Moscow";
+    private static string s_strLibya = s_isWindows ? "Libya Standard Time" : "Africa/Tripoli";
+    private static string s_strCatamarca = s_isWindows ? "Argentina Standard Time" : "America/Argentina/Catamarca";
+    private static string s_strLisbon = s_isWindows ? "GMT Standard Time" : "Europe/Lisbon";
+    private static string s_strNewfoundland = s_isWindows ? "Newfoundland Standard Time" : "America/St_Johns";
 
     private static TimeZoneInfo s_myUtc = TimeZoneInfo.Utc;
     private static TimeZoneInfo s_myLocal = TimeZoneInfo.Local;
@@ -101,11 +104,10 @@ public static class TimeZoneInfoTests
 
         DateTime libyaLocalTime = TimeZoneInfo.ConvertTime(endOf2011, tripoli);
         DateTime expectResult = new DateTime(2012, 1, 1, 2, 0, 0).AddTicks(-1);
-        Assert.True(libyaLocalTime.Equals(expectResult), String.Format("Expected {0} and got {1}", expectResult, libyaLocalTime));
+        Assert.True(libyaLocalTime.Equals(expectResult), string.Format("Expected {0} and got {1}", expectResult, libyaLocalTime));
     }
 
     [Fact]
-    [ActiveIssue(2821)]
     public static void ValidateRussiaTimeZoneTest()
     {
         TimeZoneInfo tz = TimeZoneInfo.FindSystemTimeZoneById(s_strRussian);
@@ -113,11 +115,11 @@ public static class TimeZoneInfoTests
 
         DateTime russiaTime = TimeZoneInfo.ConvertTime(inputUtcDate, tz);
         DateTime expectResult = new DateTime(2013, 6, 1, 4, 0, 0);
-        Assert.True(russiaTime.Equals(expectResult), String.Format("Expected {0} and got {1}", expectResult, russiaTime));
+        Assert.True(russiaTime.Equals(expectResult), string.Format("Expected {0} and got {1}", expectResult, russiaTime));
 
         DateTime dt = new DateTime(2011, 12, 31, 23, 30, 0);
         TimeSpan o = tz.GetUtcOffset(dt);
-        Assert.True(o.Equals(TimeSpan.FromHours(4)), String.Format("Expected {0} and got {1}", TimeSpan.FromHours(4), o));
+        Assert.True(o.Equals(TimeSpan.FromHours(4)), string.Format("Expected {0} and got {1}", TimeSpan.FromHours(4), o));
     }
 
     [Fact]
@@ -132,7 +134,7 @@ public static class TimeZoneInfoTests
         // in .NET Core
         //
 
-        VerifyConvertException<Exception>(time1, String.Empty);
+        VerifyConvertException<Exception>(time1, string.Empty);
         VerifyConvertException<Exception>(time1, "    ");
         VerifyConvertException<Exception>(time1, "\0");
         VerifyConvertException<Exception>(time1, "Pacific"); // whole string must match
@@ -144,11 +146,10 @@ public static class TimeZoneInfoTests
         VerifyConvertException<Exception>(time1, "Pacific Standard Time\\  "); // no trailing null
         VerifyConvertException<Exception>(time1, "Pacific Standard Time\\Display");
         VerifyConvertException<Exception>(time1, "Pacific Standard Time\n"); // no trailing newline
-        VerifyConvertException<Exception>(time1, new String('a', 256)); // long string
+        VerifyConvertException<Exception>(time1, new string('a', 256)); // long string
     }
 
     [Fact]
-    [ActiveIssue(2821)]
     public static void NearMinMaxDateTimeOffsetConvertTest()
     {
         VerifyConvert(DateTimeOffset.MaxValue, TimeZoneInfo.Utc.Id, DateTimeOffset.MaxValue);
@@ -174,18 +175,10 @@ public static class TimeZoneInfoTests
         VerifyConvert(DateTime.MaxValue.AddHours(-19.5), s_strPacific, s_strSydney, DateTime.MaxValue.AddHours(-0.5));
 
         VerifyConvert(DateTime.MinValue, s_strSydney, s_strPacific, DateTime.MinValue);
-        if (s_isWindows)
-        {
-            VerifyConvert(DateTime.MinValue.AddHours(19), s_strSydney, s_strPacific, DateTime.MinValue);
-            VerifyConvert(DateTime.MinValue.AddHours(19.5), s_strSydney, s_strPacific, DateTime.MinValue.AddHours(0.5));
-        }
-        else
-        {
-            // for early times, IANA uses local mean time (LMT), which is based on the solar time.
-            // The Pacific Standard Time LMT is UTC-07:53.  For Sydney, LMT is UTC+10:04.
-            VerifyConvert(DateTime.MinValue.AddHours(17).AddMinutes(57), s_strSydney, s_strPacific, DateTime.MinValue);
-            VerifyConvert(DateTime.MinValue.AddHours(17.5).AddMinutes(57), s_strSydney, s_strPacific, DateTime.MinValue.AddHours(0.5));
-        }
+
+        TimeSpan earlyTimesDifference = GetEarlyTimesOffset(s_strSydney) - GetEarlyTimesOffset(s_strPacific);
+        VerifyConvert(DateTime.MinValue + earlyTimesDifference, s_strSydney, s_strPacific, DateTime.MinValue);
+        VerifyConvert(DateTime.MinValue.AddHours(0.5) + earlyTimesDifference, s_strSydney, s_strPacific, DateTime.MinValue.AddHours(0.5));
     }
 
     [Fact]
@@ -332,7 +325,6 @@ public static class TimeZoneInfoTests
     }
 
     [Fact]
-    [ActiveIssue(2821)]
     public static void NearMinMaxDateTimeConvertTest()
     {
         DateTime time1 = new DateTime(2006, 5, 12);
@@ -345,21 +337,13 @@ public static class TimeZoneInfoTests
         DateTime utcMinValue = DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc);
         VerifyConvert(utcMinValue, s_strPacific, DateTime.MinValue);
 
-        if (s_isWindows)
-        {
-            VerifyConvert(utcMinValue.AddHours(8), s_strPacific, DateTime.MinValue);
-            VerifyConvert(utcMinValue.AddHours(8.5), s_strPacific, DateTime.MinValue.AddHours(0.5));
-            VerifyConvert(utcMinValue, s_strSydney, DateTime.MinValue.AddHours(11));
-        }
-        else
-        {
-            // for early times, IANA uses local mean time (LMT), which is based on the solar time.
-            // The Pacific Standard Time LMT is UTC-07:53.
-            VerifyConvert(utcMinValue.AddHours(8).AddMinutes(-7), s_strPacific, DateTime.MinValue);
-            VerifyConvert(utcMinValue.AddHours(8.5).AddMinutes(-7), s_strPacific, DateTime.MinValue.AddHours(0.5));
-            // For Sydney, LMT is UTC+10:04.
-            VerifyConvert(utcMinValue, s_strSydney, DateTime.MinValue.AddHours(10).AddMinutes(4));
-        }
+        TimeSpan earlyTimesOffsetPacific = GetEarlyTimesOffset(s_strPacific);
+        earlyTimesOffsetPacific = earlyTimesOffsetPacific.Negate(); // Pacific is behind UTC, so negate for a positive value
+        VerifyConvert(utcMinValue + earlyTimesOffsetPacific, s_strPacific, DateTime.MinValue);
+        VerifyConvert(utcMinValue.AddHours(0.5) + earlyTimesOffsetPacific, s_strPacific, DateTime.MinValue.AddHours(0.5));
+
+        TimeSpan earlyTimesOffsetSydney = GetEarlyTimesOffset(s_strSydney);
+        VerifyConvert(utcMinValue, s_strSydney, DateTime.MinValue + earlyTimesOffsetSydney);
     }
 
     [Fact]
@@ -422,7 +406,6 @@ public static class TimeZoneInfoTests
     }
 
     [Fact]
-    [ActiveIssue(2821)]
     public static void PerthRulesTest()
     {
         var time1utc = new DateTime(2005, 12, 31, 15, 59, 59, DateTimeKind.Utc);
@@ -1789,11 +1772,25 @@ public static class TimeZoneInfoTests
         }
     }
 
+    [Fact]
+    public static void TestDaylightTransitionsExactTime()
+    {
+        TimeZoneInfo zone = TimeZoneInfo.FindSystemTimeZoneById(s_strPacific);
+
+        DateTime after = new DateTime(2011, 11, 6, 9, 0, 0, 0, DateTimeKind.Utc);
+        DateTime mid = after.AddTicks(-1);
+        DateTime before = after.AddTicks(-2);
+
+        Assert.Equal(TimeSpan.FromHours(-7), zone.GetUtcOffset(before));
+        Assert.Equal(TimeSpan.FromHours(-7), zone.GetUtcOffset(mid));
+        Assert.Equal(TimeSpan.FromHours(-8), zone.GetUtcOffset(after));
+    }
+
     //
     //  Helper Methods
     //
 
-    private static void VerifyConvertException<EXCTYPE>(DateTimeOffset inputTime, String destinationTimeZoneId) where EXCTYPE : Exception
+    private static void VerifyConvertException<EXCTYPE>(DateTimeOffset inputTime, string destinationTimeZoneId) where EXCTYPE : Exception
     {
         Assert.ThrowsAny<EXCTYPE>(() =>
         {
@@ -1801,7 +1798,7 @@ public static class TimeZoneInfoTests
         });
     }
 
-    private static void VerifyConvertException<EXCTYPE>(DateTime inputTime, String destinationTimeZoneId) where EXCTYPE : Exception
+    private static void VerifyConvertException<EXCTYPE>(DateTime inputTime, string destinationTimeZoneId) where EXCTYPE : Exception
     {
         Assert.ThrowsAny<EXCTYPE>(() =>
         {
@@ -1809,7 +1806,7 @@ public static class TimeZoneInfoTests
         });
     }
 
-    private static void VerifyConvertException<EXCTYPE>(DateTime inputTime, String sourceTimeZoneId, String destinationTimeZoneId) where EXCTYPE : Exception
+    private static void VerifyConvertException<EXCTYPE>(DateTime inputTime, string sourceTimeZoneId, string destinationTimeZoneId) where EXCTYPE : Exception
     {
         Assert.ThrowsAny<EXCTYPE>(() =>
         {
@@ -1817,34 +1814,34 @@ public static class TimeZoneInfoTests
         });
     }
 
-    private static void VerifyConvert(DateTimeOffset inputTime, String destinationTimeZoneId, DateTimeOffset expectedTime)
+    private static void VerifyConvert(DateTimeOffset inputTime, string destinationTimeZoneId, DateTimeOffset expectedTime)
     {
         DateTimeOffset returnedTime = TimeZoneInfo.ConvertTime(inputTime, TimeZoneInfo.FindSystemTimeZoneById(destinationTimeZoneId));
-        Assert.True(returnedTime.Equals(expectedTime), String.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime, returnedTime, inputTime, destinationTimeZoneId));
+        Assert.True(returnedTime.Equals(expectedTime), string.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime, returnedTime, inputTime, destinationTimeZoneId));
     }
 
-    private static void VerifyConvert(DateTime inputTime, String destinationTimeZoneId, DateTime expectedTime)
+    private static void VerifyConvert(DateTime inputTime, string destinationTimeZoneId, DateTime expectedTime)
     {
         DateTime returnedTime = TimeZoneInfo.ConvertTime(inputTime, TimeZoneInfo.FindSystemTimeZoneById(destinationTimeZoneId));
-        Assert.True(returnedTime.Equals(expectedTime), String.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime, returnedTime, inputTime, destinationTimeZoneId));
-        Assert.True(expectedTime.Kind == returnedTime.Kind, String.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime.Kind, returnedTime.Kind, inputTime, destinationTimeZoneId));
+        Assert.True(returnedTime.Equals(expectedTime), string.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime, returnedTime, inputTime, destinationTimeZoneId));
+        Assert.True(expectedTime.Kind == returnedTime.Kind, string.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime.Kind, returnedTime.Kind, inputTime, destinationTimeZoneId));
     }
 
-    private static void VerifyConvert(DateTime inputTime, String destinationTimeZoneId, DateTime expectedTime, DateTimeKind expectedKind)
+    private static void VerifyConvert(DateTime inputTime, string destinationTimeZoneId, DateTime expectedTime, DateTimeKind expectedKind)
     {
         DateTime returnedTime = TimeZoneInfo.ConvertTime(inputTime, TimeZoneInfo.FindSystemTimeZoneById(destinationTimeZoneId));
-        Assert.True(returnedTime.Equals(expectedTime), String.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime, returnedTime, inputTime, destinationTimeZoneId));
-        Assert.True(expectedKind == returnedTime.Kind, String.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime.Kind, returnedTime.Kind, inputTime, destinationTimeZoneId));
+        Assert.True(returnedTime.Equals(expectedTime), string.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime, returnedTime, inputTime, destinationTimeZoneId));
+        Assert.True(expectedKind == returnedTime.Kind, string.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', TimeZone: {3}", expectedTime.Kind, returnedTime.Kind, inputTime, destinationTimeZoneId));
     }
 
-    private static void VerifyConvert(DateTime inputTime, String sourceTimeZoneId, String destinationTimeZoneId, DateTime expectedTime)
+    private static void VerifyConvert(DateTime inputTime, string sourceTimeZoneId, string destinationTimeZoneId, DateTime expectedTime)
     {
         DateTime returnedTime = TimeZoneInfo.ConvertTime(inputTime, TimeZoneInfo.FindSystemTimeZoneById(sourceTimeZoneId), TimeZoneInfo.FindSystemTimeZoneById(destinationTimeZoneId));
-        Assert.True(returnedTime.Equals(expectedTime), String.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', Source TimeZone: {3}, Dest. Time Zone: {4}", expectedTime, returnedTime, inputTime, sourceTimeZoneId, destinationTimeZoneId));
-        Assert.True(expectedTime.Kind == returnedTime.Kind, String.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', Source TimeZone: {3}, Dest. Time Zone: {4}", expectedTime.Kind, returnedTime.Kind, inputTime, sourceTimeZoneId, destinationTimeZoneId));
+        Assert.True(returnedTime.Equals(expectedTime), string.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', Source TimeZone: {3}, Dest. Time Zone: {4}", expectedTime, returnedTime, inputTime, sourceTimeZoneId, destinationTimeZoneId));
+        Assert.True(expectedTime.Kind == returnedTime.Kind, string.Format("Error: Expected value '{0}' but got '{1}', input value is '{2}', Source TimeZone: {3}, Dest. Time Zone: {4}", expectedTime.Kind, returnedTime.Kind, inputTime, sourceTimeZoneId, destinationTimeZoneId));
     }
 
-    private static void VerifyRoundTrip(DateTime dt1, String sourceTimeZoneId, String destinationTimeZoneId)
+    private static void VerifyRoundTrip(DateTime dt1, string sourceTimeZoneId, string destinationTimeZoneId)
     {
         TimeZoneInfo sourceTzi = TimeZoneInfo.FindSystemTimeZoneById(sourceTimeZoneId);
         TimeZoneInfo destTzi = TimeZoneInfo.FindSystemTimeZoneById(destinationTimeZoneId);
@@ -1852,11 +1849,11 @@ public static class TimeZoneInfoTests
         DateTime dt2 = TimeZoneInfo.ConvertTime(dt1, sourceTzi, destTzi);
         DateTime dt3 = TimeZoneInfo.ConvertTime(dt2, destTzi, sourceTzi);
 
-        Assert.True(dt1.Equals(dt3), String.Format("{0} failed to round trip using source '{1}' and '{2}' zones. wrong result {3}", dt1, sourceTimeZoneId, destinationTimeZoneId, dt3));
+        Assert.True(dt1.Equals(dt3), string.Format("{0} failed to round trip using source '{1}' and '{2}' zones. wrong result {3}", dt1, sourceTimeZoneId, destinationTimeZoneId, dt3));
 
         if (sourceTimeZoneId == TimeZoneInfo.Utc.Id)
         {
-            Assert.True(dt3.Kind == DateTimeKind.Utc, String.Format("failed to get the right DT Kind after round trip {0} using source TZ {1} and dest TZi {2}", dt1, sourceTimeZoneId, destinationTimeZoneId));
+            Assert.True(dt3.Kind == DateTimeKind.Utc, string.Format("failed to get the right DT Kind after round trip {0} using source TZ {1} and dest TZi {2}", dt1, sourceTimeZoneId, destinationTimeZoneId));
         }
     }
 
@@ -1871,10 +1868,10 @@ public static class TimeZoneInfoTests
     private static void VerifyOffsets(TimeZoneInfo tz, DateTime dt, TimeSpan[] expectedOffsets)
     {
         TimeSpan[] ret = tz.GetAmbiguousTimeOffsets(dt);
-        VerifyTimeSpanArray(ret, expectedOffsets, String.Format("Wrong offsets when used {0} with teh zone {1}", dt, tz.Id));
+        VerifyTimeSpanArray(ret, expectedOffsets, string.Format("Wrong offsets when used {0} with teh zone {1}", dt, tz.Id));
     }
 
-    static public void VerifyTimeSpanArray(TimeSpan[] actual, TimeSpan[] expected, String errorMsg)
+    static public void VerifyTimeSpanArray(TimeSpan[] actual, TimeSpan[] expected, string errorMsg)
     {
         Assert.True(actual != null);
         Assert.True(expected != null);
@@ -1891,18 +1888,64 @@ public static class TimeZoneInfoTests
     private static void VerifyDST(TimeZoneInfo tz, DateTime dt, bool expectedDST)
     {
         bool ret = tz.IsDaylightSavingTime(dt);
-        Assert.True(ret == expectedDST, String.Format("Test with the zone {0} and date {1} failed", tz.Id, dt));
+        Assert.True(ret == expectedDST, string.Format("Test with the zone {0} and date {1} failed", tz.Id, dt));
     }
 
     private static void VerifyInv(TimeZoneInfo tz, DateTime dt, bool expectedInvalid)
     {
         bool ret = tz.IsInvalidTime(dt);
-        Assert.True(expectedInvalid == ret, String.Format("Test with the zone {0} and date {1} failed", tz.Id, dt));
+        Assert.True(expectedInvalid == ret, string.Format("Test with the zone {0} and date {1} failed", tz.Id, dt));
     }
 
     private static void VerifyAmbiguous(TimeZoneInfo tz, DateTime dt, bool expectedAmbiguous)
     {
         bool ret = tz.IsAmbiguousTime(dt);
-        Assert.True(expectedAmbiguous == ret, String.Format("Test with the zone {0} and date {1} failed", tz.Id, dt));
+        Assert.True(expectedAmbiguous == ret, string.Format("Test with the zone {0} and date {1} failed", tz.Id, dt));
+    }
+
+    /// <summary>
+    /// Gets the offset for the time zone for early times (close to DateTime.MinValue).
+    /// </summary>
+    /// <remarks>
+    /// Windows uses the current daylight savings rules for early times.
+    /// 
+    /// OSX has V1 tzfiles, which means for early times it uses the first standard offset in the tzfile.
+    /// For Pacific Standard Time it is UTC-8.  For Sydney, it is UTC+10.
+    /// 
+    /// Other Unix distros use V2 tzfiles, which use local mean time (LMT), which is based on the solar time.
+    /// The Pacific Standard Time LMT is UTC-07:53.  For Sydney, LMT is UTC+10:04.
+    /// </remarks>
+    private static TimeSpan GetEarlyTimesOffset(string timeZoneId)
+    {
+        if (timeZoneId == s_strPacific)
+        {
+            if (s_isWindows || s_isOSX)
+            {
+                return TimeSpan.FromHours(-8);
+            }
+            else
+            {
+                return new TimeSpan(7, 53, 0).Negate();
+            }
+        }
+        else if (timeZoneId == s_strSydney)
+        {
+            if (s_isWindows)
+            {
+                return TimeSpan.FromHours(11);
+            }
+            else if (s_isOSX)
+            {
+                return TimeSpan.FromHours(10);
+            }
+            else
+            {
+                return new TimeSpan(10, 4, 0);
+            }
+        }
+        else
+        {
+            throw new NotSupportedException(string.Format("The timeZoneId '{0}' is not supported by GetEarlyTimesOffset.", timeZoneId));
+        }
     }
 }

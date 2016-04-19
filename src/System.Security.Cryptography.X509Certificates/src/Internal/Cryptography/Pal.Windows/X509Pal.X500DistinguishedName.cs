@@ -22,7 +22,7 @@ namespace Internal.Cryptography.Pal
     /// </summary>
     internal sealed partial class X509Pal : IX509Pal
     {
-        public String X500DistinguishedNameDecode(byte[] encodedDistinguishedName, X500DistinguishedNameFlags flag)
+        public string X500DistinguishedNameDecode(byte[] encodedDistinguishedName, X500DistinguishedNameFlags flag)
         {
             CertNameStrTypeAndFlags dwStrType = CertNameStrTypeAndFlags.CERT_X500_NAME_STR | MapNameToStrFlag(flag);
             unsafe
@@ -35,18 +35,18 @@ namespace Internal.Cryptography.Pal
 
                     int cchDecoded = Interop.crypt32.CertNameToStr(CertEncodingType.All, ref nameBlob, dwStrType, null, 0);
                     if (cchDecoded == 0)
-                        throw new CryptographicException(ErrorCode.CERT_E_INVALID_NAME);
+                        throw ErrorCode.CERT_E_INVALID_NAME.ToCryptographicException();
 
                     StringBuilder sb = new StringBuilder(cchDecoded);
                     if (Interop.crypt32.CertNameToStr(CertEncodingType.All, ref nameBlob, dwStrType, sb, cchDecoded) == 0)
-                        throw new CryptographicException(ErrorCode.CERT_E_INVALID_NAME);
+                        throw ErrorCode.CERT_E_INVALID_NAME.ToCryptographicException();
 
                     return sb.ToString();
                 }
             }
         }
 
-        public byte[] X500DistinguishedNameEncode(String distinguishedName, X500DistinguishedNameFlags flag)
+        public byte[] X500DistinguishedNameEncode(string distinguishedName, X500DistinguishedNameFlags flag)
         {
             Debug.Assert(distinguishedName != null);
 
@@ -54,19 +54,19 @@ namespace Internal.Cryptography.Pal
 
             int cbEncoded = 0;
             if (!Interop.crypt32.CertStrToName(CertEncodingType.All, distinguishedName, dwStrType, IntPtr.Zero, null, ref cbEncoded, IntPtr.Zero))
-                throw new CryptographicException(Marshal.GetLastWin32Error());
+                throw Marshal.GetLastWin32Error().ToCryptographicException();
 
             byte[] encodedName = new byte[cbEncoded];
             if (!Interop.crypt32.CertStrToName(CertEncodingType.All, distinguishedName, dwStrType, IntPtr.Zero, encodedName, ref cbEncoded, IntPtr.Zero))
-                throw new CryptographicException(Marshal.GetLastWin32Error());
+                throw Marshal.GetLastWin32Error().ToCryptographicException();
 
             return encodedName;
         }
 
-        public String X500DistinguishedNameFormat(byte[] encodedDistinguishedName, bool multiLine)
+        public string X500DistinguishedNameFormat(byte[] encodedDistinguishedName, bool multiLine)
         {
             if (encodedDistinguishedName == null || encodedDistinguishedName.Length == 0)
-                return String.Empty;
+                return string.Empty;
 
             FormatObjectStringType stringType = multiLine ? FormatObjectStringType.CRYPT_FORMAT_STR_MULTI_LINE : FormatObjectStringType.None;
 

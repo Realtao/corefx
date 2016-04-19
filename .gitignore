@@ -136,8 +136,12 @@ publish/
 *.publishproj
 
 # NuGet Packages
+*.nuget.props
 *.nupkg
 **/packages/*
+
+# NuGet package restore lockfiles
+project.lock.json
 
 # Windows Azure Build Output
 csx/

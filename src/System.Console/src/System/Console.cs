@@ -19,7 +19,7 @@ namespace System
         private static ConsoleCancelEventHandler _cancelCallbacks;
         private static ConsolePal.ControlCHandlerRegistrar _registrar;
 
-        private static T EnsureInitialized<T>(ref T field, Func<T> initializer) where T : class
+        internal static T EnsureInitialized<T>(ref T field, Func<T> initializer) where T : class
         {
             lock (InternalSyncObject)
             {
@@ -39,17 +39,32 @@ namespace System
             {
                 return Volatile.Read(ref _in) ?? EnsureInitialized(ref _in, () =>
                 {
-                    Stream inputStream = OpenStandardInput();
-                    return SyncTextReader.GetSynchronizedTextReader(inputStream == Stream.Null ?
-                        StreamReader.Null :
-                        new StreamReader(
-                            stream: inputStream,
-                            encoding: ConsolePal.InputEncoding,
-                            detectEncodingFromByteOrderMarks: false,
-                            bufferSize: DefaultConsoleBufferSize,
-                            leaveOpen: true));
+                    return ConsolePal.GetOrCreateReader();
                 });
             }
+        }
+
+        public static bool KeyAvailable
+        {
+            get
+            {
+                if (IsInputRedirected)
+                {
+                    throw new InvalidOperationException(SR.InvalidOperation_ConsoleKeyAvailableOnFile);
+                }
+
+                return ConsolePal.KeyAvailable;
+            }
+        }
+
+        public static ConsoleKeyInfo ReadKey()
+        {
+            return ConsolePal.ReadKey(false);
+        }
+
+        public static ConsoleKeyInfo ReadKey(bool intercept)
+        {
+            return ConsolePal.ReadKey(intercept);
         }
 
         public static TextWriter Out
@@ -73,6 +88,40 @@ namespace System
                     leaveOpen: true) { AutoFlush = true });
         }
 
+        private static StrongBox<bool> _isStdInRedirected;
+        private static StrongBox<bool> _isStdOutRedirected;
+        private static StrongBox<bool> _isStdErrRedirected;
+
+        public static bool IsInputRedirected
+        {
+            get
+            {
+                StrongBox<bool> redirected = Volatile.Read(ref _isStdInRedirected) ??
+                    EnsureInitialized(ref _isStdInRedirected, () => new StrongBox<bool>(ConsolePal.IsInputRedirectedCore()));
+                return redirected.Value;
+            }
+        }
+
+        public static bool IsOutputRedirected
+        {
+            get
+            {
+                StrongBox<bool> redirected = Volatile.Read(ref _isStdOutRedirected) ??
+                    EnsureInitialized(ref _isStdOutRedirected, () => new StrongBox<bool>(ConsolePal.IsOutputRedirectedCore()));
+                return redirected.Value;
+            }
+        }
+
+        public static bool IsErrorRedirected
+        {
+            get
+            {
+                StrongBox<bool> redirected = Volatile.Read(ref _isStdErrRedirected) ??
+                    EnsureInitialized(ref _isStdErrRedirected, () => new StrongBox<bool>(ConsolePal.IsErrorRedirectedCore()));
+                return redirected.Value;
+            }
+        }
+
         public static ConsoleColor BackgroundColor
         {
             get { return ConsolePal.BackgroundColor; }
@@ -88,6 +137,122 @@ namespace System
         public static void ResetColor()
         {
             ConsolePal.ResetColor();
+        }
+
+        public static int BufferWidth
+        {
+            get { return ConsolePal.BufferWidth; }
+            set { ConsolePal.BufferWidth = value; }
+        }
+
+        public static int BufferHeight
+        {
+            get { return ConsolePal.BufferHeight; }
+            set { ConsolePal.BufferHeight = value; }
+        }
+
+        public static int WindowLeft
+        {
+            get { return ConsolePal.WindowLeft; }
+            set { ConsolePal.WindowLeft = value; }
+        }
+
+        public static int WindowTop
+        {
+            get { return ConsolePal.WindowTop; }
+            set { ConsolePal.WindowTop = value; }
+        }
+
+        public static int WindowWidth
+        {
+            get
+            {
+                return ConsolePal.WindowWidth;
+            }
+            set
+            {
+                if (value <= 0)
+                {
+                    throw new ArgumentOutOfRangeException("value", value, SR.ArgumentOutOfRange_NeedPosNum);
+                }
+                ConsolePal.WindowWidth = value;
+            }
+        }
+
+        public static int WindowHeight
+        {
+            get
+            {
+                return ConsolePal.WindowHeight;
+            }
+            set
+            {
+                if (value <= 0)
+                {
+                    throw new ArgumentOutOfRangeException("value", value, SR.ArgumentOutOfRange_NeedPosNum);
+                }
+                ConsolePal.WindowHeight = value;
+            }
+        }
+
+        public static bool CursorVisible
+        {
+            get { return ConsolePal.CursorVisible; }
+            set { ConsolePal.CursorVisible = value; }
+        }
+
+        public static int CursorLeft
+        {
+            get { return ConsolePal.CursorLeft; }
+            set { SetCursorPosition(value, CursorTop); }
+        }
+
+        public static int CursorTop
+        {
+            get { return ConsolePal.CursorTop; }
+            set { SetCursorPosition(CursorLeft, value); }
+        }
+
+        private const int MaxConsoleTitleLength = 24500; // same value as in .NET Framework
+
+        public static string Title
+        {
+            get { return ConsolePal.Title; }
+            set
+            {
+                if (value == null)
+                {
+                    throw new ArgumentNullException("value");
+                }
+
+                if (value.Length > MaxConsoleTitleLength)
+                {
+                    throw new ArgumentOutOfRangeException("value", SR.ArgumentOutOfRange_ConsoleTitleTooLong);
+                }
+
+                ConsolePal.Title = value;
+            }
+        }
+
+        public static void Beep()
+        {
+            ConsolePal.Beep();
+        }
+
+        public static void Clear()
+        {
+            ConsolePal.Clear();
+        }
+
+        public static void SetCursorPosition(int left, int top)
+        {
+            // Basic argument validation.  The PAL implementation may provide further validation.
+            if (left < 0 || left >= short.MaxValue)
+                throw new ArgumentOutOfRangeException("left", left, SR.ArgumentOutOfRange_ConsoleBufferBoundaries);
+            if (top < 0 || top >= short.MaxValue)
+                throw new ArgumentOutOfRangeException("top", top, SR.ArgumentOutOfRange_ConsoleBufferBoundaries);
+
+            ConsolePal.SetCursorPosition(left, top);
         }
 
         public static event ConsoleCancelEventHandler CancelKeyPress

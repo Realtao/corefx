@@ -4,9 +4,9 @@
 
   <ItemGroup>
     <!-- System.Runtime.WindowsRuntime depends on some internal-only paths, disable from corefx build for now -->
-    <ExcludeProjects Include="System.Runtime.WindowsRuntime\ref\4.0\System.Runtime.WindowsRuntime.csproj" />
-    <Project Include="*\src\*.csproj" Exclude="@(ExcludeProjects)" />
-    <Project Include="*\src\*.vbproj" Condition="'$(IncludeVbProjects)'!='false'" Exclude="@(ExcludeProjects)" />
+    <ExcludeProjects Include="System.Runtime.WindowsRuntime\ref\System.Runtime.WindowsRuntime.csproj" />
+    <Project Include="*\ref\**\*.*proj" Exclude="@(ExcludeProjects)" />
+    <Project Include="*\src\*.builds" Exclude="@(ExcludeProjects)" />
     <Project Include="*\test*\**\*.csproj" Exclude="@(ExcludeProjects)" />
     <Project Include="*\test*\**\*.vbproj" Condition="'$(IncludeVbProjects)'!='false'" Exclude="@(ExcludeProjects)" />
   </ItemGroup>
@@ -30,5 +30,14 @@
   </PropertyGroup>
   <Import Project="$(ToolsDir)CodeCoverage.targets" Condition="Exists('$(ToolsDir)CodeCoverage.targets')" />
   <Import Project="$(ToolsDir)PerfTesting.targets" Condition="Exists('$(ToolsDir)PerfTesting.targets')" />
+
+  <!-- When doing a traversal build restore the tools runtime before the traversal starts to avoid races -->
+  <Import Project="$(ToolsDir)toolruntime.targets" Condition="Exists('$(ToolsDir)toolruntime.targets')" />
+  <PropertyGroup Condition="Exists('$(ToolsDir)toolruntime.targets')">
+    <TraversalBuildDependsOn>
+      EnsureBuildToolsRuntime;
+      $(TraversalBuildDependsOn)
+    </TraversalBuildDependsOn>
+  </PropertyGroup>
 
 </Project>

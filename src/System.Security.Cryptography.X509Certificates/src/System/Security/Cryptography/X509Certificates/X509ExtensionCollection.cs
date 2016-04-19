@@ -48,14 +48,14 @@ namespace System.Security.Cryptography.X509Certificates
             }
         }
 
-        public X509Extension this[String oid]
+        public X509Extension this[string oid]
         {
             get
             {
-                String oidValue = new Oid(oid).Value;
+                string oidValue = new Oid(oid).Value;
                 foreach (X509Extension extension in _list)
                 {
-                    if (String.Equals(extension.Oid.Value, oidValue, StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(extension.Oid.Value, oidValue, StringComparison.OrdinalIgnoreCase))
                         return extension;
                 }
                 return null;
@@ -103,7 +103,7 @@ namespace System.Security.Cryptography.X509Certificates
             return new X509ExtensionEnumerator(this);
         }
 
-        private LowLevelListWithIList<X509Extension> _list = new LowLevelListWithIList<X509Extension>();
+        private readonly List<X509Extension> _list = new List<X509Extension>();
     }
 }
 

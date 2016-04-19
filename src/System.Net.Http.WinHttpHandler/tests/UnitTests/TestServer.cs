@@ -12,9 +12,14 @@ namespace System.Net.Http.WinHttpHandlerUnitTests
 {
     public static class TestServer
     {
+        public const string ExpectedResponseBody = "This is the response body.";
+        public const string FakeServerEndpoint = "http://www.contoso.com/";
+        public const string FakeSecureServerEndpoint = "https://www.contoso.com/";
+
         private static MemoryStream requestBody = null;
         private static MemoryStream responseBody = null;
         private static string responseHeaders = null;
+        private static double dataAvailablePercentage = 1.0;
 
         public static byte[] RequestBody
         {
@@ -43,6 +48,39 @@ namespace System.Net.Http.WinHttpHandlerUnitTests
             set
             {
                 responseHeaders = value;
+            }
+        }
+
+        public static double DataAvailablePercentage
+        {
+            get
+            {
+                return dataAvailablePercentage;
+            }
+            
+            set
+            {
+                dataAvailablePercentage = value;
+            }
+        }
+
+        public static int DataAvailable
+        {
+            get
+            {
+                if (responseBody == null)
+                {
+                    return 0;
+                }
+
+                int totalBytesLeftToRead = (int)(responseBody.Length - responseBody.Position);
+                int allowedBytesToRead = (int)((double)totalBytesLeftToRead * dataAvailablePercentage);
+                if (allowedBytesToRead == 0 && totalBytesLeftToRead != 0)
+                {
+                    allowedBytesToRead = 1;
+                }
+                
+                return allowedBytesToRead;
             }
         }
 
@@ -128,6 +166,7 @@ namespace System.Net.Http.WinHttpHandlerUnitTests
             requestBody = new MemoryStream();
             responseBody = new MemoryStream();
             responseHeaders = null;
+            dataAvailablePercentage = 1.0;
         }
     }
 }

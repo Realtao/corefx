@@ -358,16 +358,12 @@ namespace Microsoft.Win32
             RegistryKey key = InternalOpenSubKey(subkey, false);
             if (key != null)
             {
-                try
+                using (key)
                 {
                     if (key.InternalSubKeyCount() > 0)
                     {
                         ThrowHelper.ThrowInvalidOperationException(SR.InvalidOperation_RegRemoveSubKey);
                     }
-                }
-                finally
-                {
-                    key.Close();
                 }
 
                 int ret = Interop.mincore.RegDeleteKeyEx(hkey, subkey, (int)regView, 0);
@@ -419,7 +415,7 @@ namespace Microsoft.Win32
             RegistryKey key = InternalOpenSubKey(subkey, true);
             if (key != null)
             {
-                try
+                using (key)
                 {
                     if (key.InternalSubKeyCount() > 0)
                     {
@@ -430,10 +426,6 @@ namespace Microsoft.Win32
                             key.DeleteSubKeyTreeInternal(keys[i]);
                         }
                     }
-                }
-                finally
-                {
-                    key.Close();
                 }
 
                 int ret = Interop.mincore.RegDeleteKeyEx(hkey, subkey, (int)regView, 0);
@@ -454,7 +446,7 @@ namespace Microsoft.Win32
             RegistryKey key = InternalOpenSubKey(subkey, true);
             if (key != null)
             {
-                try
+                using (key)
                 {
                     if (key.InternalSubKeyCount() > 0)
                     {
@@ -465,10 +457,6 @@ namespace Microsoft.Win32
                             key.DeleteSubKeyTreeInternal(keys[i]);
                         }
                     }
-                }
-                finally
-                {
-                    key.Close();
                 }
 
                 int ret = Interop.mincore.RegDeleteKeyEx(hkey, subkey, (int)regView, 0);
@@ -1202,18 +1190,7 @@ namespace Microsoft.Win32
                         // make sure the string is null terminated before processing the data
                         if (blob.Length > 0 && blob[blob.Length - 1] != (char)0)
                         {
-                            try
-                            {
-                                char[] newBlob = new char[checked(blob.Length + 1)];
-                                Array.Copy(blob, 0, newBlob, 0, blob.Length);
-                                newBlob[newBlob.Length - 1] = (char)0;
-                                blob = newBlob;
-                            }
-                            catch (OverflowException e)
-                            {
-                                throw new IOException(SR.Arg_RegGetOverflowBug, e);
-                            }
-                            blob[blob.Length - 1] = (char)0;
+                            Array.Resize(ref blob, blob.Length + 1);
                         }
 
                         var strings = new List<String>();
@@ -1282,7 +1259,7 @@ namespace Microsoft.Win32
         /**
          * Retrieves the current state of the dirty property.
          *
-         * A key is marked as dirty if any operation has occured that modifies the
+         * A key is marked as dirty if any operation has occurred that modifies the
          * contents of the key.
          *
          * @return <b>true</b> if the key has been modified.

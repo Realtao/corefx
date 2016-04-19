@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Dynamic.Utils;
 using System.Threading;
 
@@ -96,11 +97,13 @@ namespace System.Linq.Expressions
             return Expression.Block(Type, variables, expressions);
         }
 
+        [ExcludeFromCodeCoverage] // Unreachable
         internal virtual Expression GetExpression(int index)
         {
             throw ContractUtils.Unreachable;
         }
 
+        [ExcludeFromCodeCoverage] // Unreachable
         internal virtual int ExpressionCount
         {
             get
@@ -109,11 +112,13 @@ namespace System.Linq.Expressions
             }
         }
 
+        [ExcludeFromCodeCoverage] // Unreachable
         internal virtual ReadOnlyCollection<Expression> GetOrMakeExpressions()
         {
             throw ContractUtils.Unreachable;
         }
 
+        [ExcludeFromCodeCoverage] // Unreachable
         internal virtual ParameterExpression GetVariable(int index)
         {
             throw ContractUtils.Unreachable;
@@ -142,6 +147,7 @@ namespace System.Linq.Expressions
         /// This helper is provided to allow re-writing of nodes to not depend on the specific optimized
         /// subclass of BlockExpression which is being used. 
         /// </summary>
+        [ExcludeFromCodeCoverage] // Unreachable
         internal virtual BlockExpression Rewrite(ReadOnlyCollection<ParameterExpression> variables, Expression[] args)
         {
             throw ContractUtils.Unreachable;
@@ -216,6 +222,7 @@ namespace System.Linq.Expressions
 
         internal override BlockExpression Rewrite(ReadOnlyCollection<ParameterExpression> variables, Expression[] args)
         {
+            Debug.Assert(args != null);
             Debug.Assert(args.Length == 2);
             Debug.Assert(variables == null || variables.Count == 0);
 
@@ -261,6 +268,7 @@ namespace System.Linq.Expressions
 
         internal override BlockExpression Rewrite(ReadOnlyCollection<ParameterExpression> variables, Expression[] args)
         {
+            Debug.Assert(args != null);
             Debug.Assert(args.Length == 3);
             Debug.Assert(variables == null || variables.Count == 0);
 
@@ -308,6 +316,7 @@ namespace System.Linq.Expressions
 
         internal override BlockExpression Rewrite(ReadOnlyCollection<ParameterExpression> variables, Expression[] args)
         {
+            Debug.Assert(args != null);
             Debug.Assert(args.Length == 4);
             Debug.Assert(variables == null || variables.Count == 0);
 
@@ -357,6 +366,7 @@ namespace System.Linq.Expressions
 
         internal override BlockExpression Rewrite(ReadOnlyCollection<ParameterExpression> variables, Expression[] args)
         {
+            Debug.Assert(args != null);
             Debug.Assert(args.Length == 5);
             Debug.Assert(variables == null || variables.Count == 0);
 
@@ -398,6 +408,7 @@ namespace System.Linq.Expressions
         internal override BlockExpression Rewrite(ReadOnlyCollection<ParameterExpression> variables, Expression[] args)
         {
             Debug.Assert(variables == null || variables.Count == 0);
+            Debug.Assert(args != null);
 
             return new BlockN(args);
         }
@@ -459,6 +470,11 @@ namespace System.Linq.Expressions
         private object _body;
 
         internal Scope1(IList<ParameterExpression> variables, Expression body)
+            : this(variables, (object)body)
+        {
+        }
+
+        private Scope1(IList<ParameterExpression> variables, object body)
             : base(variables)
         {
             _body = body;
@@ -488,6 +504,12 @@ namespace System.Linq.Expressions
 
         internal override BlockExpression Rewrite(ReadOnlyCollection<ParameterExpression> variables, Expression[] args)
         {
+            if (args == null)
+            {
+                Debug.Assert(variables.Count == VariableCount);
+                ValidateVariables(variables, "variables");
+                return new Scope1(variables, _body);
+            }
             Debug.Assert(args.Length == 1);
             Debug.Assert(variables == null || variables.Count == VariableCount);
 
@@ -503,6 +525,11 @@ namespace System.Linq.Expressions
             : base(variables)
         {
             _body = body;
+        }
+
+        protected IList<Expression> Body
+        {
+            get { return _body; }
         }
 
         internal override Expression GetExpression(int index)
@@ -525,6 +552,12 @@ namespace System.Linq.Expressions
 
         internal override BlockExpression Rewrite(ReadOnlyCollection<ParameterExpression> variables, Expression[] args)
         {
+            if (args == null)
+            {
+                Debug.Assert(variables.Count == VariableCount);
+                ValidateVariables(variables, "variables");
+                return new ScopeN(variables, _body);
+            }
             Debug.Assert(args.Length == ExpressionCount);
             Debug.Assert(variables == null || variables.Count == VariableCount);
 
@@ -549,6 +582,12 @@ namespace System.Linq.Expressions
 
         internal override BlockExpression Rewrite(ReadOnlyCollection<ParameterExpression> variables, Expression[] args)
         {
+            if (args == null)
+            {
+                Debug.Assert(variables.Count == VariableCount);
+                ValidateVariables(variables, "variables");
+                return new ScopeWithType(variables, Body, _type);
+            }
             Debug.Assert(args.Length == ExpressionCount);
             Debug.Assert(variables == null || variables.Count == VariableCount);
 
@@ -601,11 +640,13 @@ namespace System.Linq.Expressions
             return -1;
         }
 
+        [ExcludeFromCodeCoverage] // Unreachable
         public void Insert(int index, Expression item)
         {
             throw ContractUtils.Unreachable;
         }
 
+        [ExcludeFromCodeCoverage] // Unreachable
         public void RemoveAt(int index)
         {
             throw ContractUtils.Unreachable;
@@ -622,6 +663,7 @@ namespace System.Linq.Expressions
 
                 return _block.GetExpression(index);
             }
+            [ExcludeFromCodeCoverage] // Unreachable
             set
             {
                 throw ContractUtils.Unreachable;
@@ -632,11 +674,13 @@ namespace System.Linq.Expressions
 
         #region ICollection<Expression> Members
 
+        [ExcludeFromCodeCoverage] // Unreachable
         public void Add(Expression item)
         {
             throw ContractUtils.Unreachable;
         }
 
+        [ExcludeFromCodeCoverage] // Unreachable
         public void Clear()
         {
             throw ContractUtils.Unreachable;
@@ -661,11 +705,16 @@ namespace System.Linq.Expressions
             get { return _block.ExpressionCount; }
         }
 
+        [ExcludeFromCodeCoverage] // Unreachable
         public bool IsReadOnly
         {
-            get { return true; }
+            get
+            {
+                throw ContractUtils.Unreachable;
+            }
         }
 
+        [ExcludeFromCodeCoverage] // Unreachable
         public bool Remove(Expression item)
         {
             throw ContractUtils.Unreachable;
@@ -779,17 +828,7 @@ namespace System.Linq.Expressions
         {
             ContractUtils.RequiresNotNull(expressions, "expressions");
 
-            switch (expressions.Length)
-            {
-                case 2: return Block(expressions[0], expressions[1]);
-                case 3: return Block(expressions[0], expressions[1], expressions[2]);
-                case 4: return Block(expressions[0], expressions[1], expressions[2], expressions[3]);
-                case 5: return Block(expressions[0], expressions[1], expressions[2], expressions[3], expressions[4]);
-                default:
-                    ContractUtils.RequiresNotEmpty(expressions, "expressions");
-                    RequiresCanRead(expressions, "expressions");
-                    return new BlockN(expressions.Copy());
-            }
+            return GetOptimizedBlockExpression(expressions);
         }
 
         /// <summary>
@@ -857,11 +896,15 @@ namespace System.Linq.Expressions
         public static BlockExpression Block(IEnumerable<ParameterExpression> variables, IEnumerable<Expression> expressions)
         {
             ContractUtils.RequiresNotNull(expressions, "expressions");
-            var expressionList = expressions.ToReadOnly();
-            ContractUtils.RequiresNotEmpty(expressionList, "expressions");
-            RequiresCanRead(expressionList, "expressions");
+            var variableList = variables.ToReadOnly();
 
-            return Block(expressionList.Last().Type, variables, expressionList);
+            if (variableList.Count == 0)
+            {
+                return GetOptimizedBlockExpression(expressions as IReadOnlyList<Expression> ?? expressions.ToReadOnly());
+            }
+
+            var expressionList = expressions.ToReadOnly();
+            return BlockCore(expressionList.Last().Type, variableList, expressionList);
         }
 
         /// <summary>
@@ -879,6 +922,26 @@ namespace System.Linq.Expressions
             var expressionList = expressions.ToReadOnly();
             var variableList = variables.ToReadOnly();
 
+            if (variableList.Count == 0)
+            {
+                var expressionCount = expressionList.Count;
+
+                if (expressionCount != 0)
+                {
+                    var lastExpression = expressionList[expressionCount - 1];
+
+                    if (lastExpression.Type == type)
+                    {
+                        return GetOptimizedBlockExpression(expressionList);
+                    }
+                }
+            }
+
+            return BlockCore(type, variableList, expressionList);
+        }
+
+        private static BlockExpression BlockCore(Type type, ReadOnlyCollection<ParameterExpression> variableList, ReadOnlyCollection<Expression> expressionList)
+        {
             ContractUtils.RequiresNotEmpty(expressionList, "expressions");
             RequiresCanRead(expressionList, "expressions");
             ValidateVariables(variableList, "variables");
@@ -935,6 +998,21 @@ namespace System.Linq.Expressions
                     throw Error.DuplicateVariable(v);
                 }
                 set.Add(v);
+            }
+        }
+
+        private static BlockExpression GetOptimizedBlockExpression(IReadOnlyList<Expression> expressions)
+        {
+            switch (expressions.Count)
+            {
+                case 2: return Block(expressions[0], expressions[1]);
+                case 3: return Block(expressions[0], expressions[1], expressions[2]);
+                case 4: return Block(expressions[0], expressions[1], expressions[2], expressions[3]);
+                case 5: return Block(expressions[0], expressions[1], expressions[2], expressions[3], expressions[4]);
+                default:
+                    ContractUtils.RequiresNotEmptyList(expressions, "expressions");
+                    RequiresCanRead(expressions, "expressions");
+                    return new BlockN(expressions as ReadOnlyCollection<Expression> ?? (IList<Expression>)expressions.ToArray());
             }
         }
     }

@@ -33,22 +33,10 @@ namespace System.IO
                     throw new ArgumentException(SR.Arg_InvalidSearchPattern, "searchPattern");
                 }
             }
-        }
 
-        internal static string GetFullPathInternal(string path)
-        {
-            if (path == null)
-                throw new ArgumentNullException("path");
-
-            if (PathInternal.IsExtended(path))
+            if (searchPattern.Length >= PathInternal.MaxComponentLength)
             {
-                // Don't want to trim extended paths
-                return Path.GetFullPath(path);
-            }
-            else
-            {
-                string pathTrimmed = path.TrimStart(TrimStartChars).TrimEnd(TrimEndChars);
-                return Path.GetFullPath(Path.IsPathRooted(pathTrimmed) ? pathTrimmed : path);
+                throw new PathTooLongException(SR.IO_PathTooLong);
             }
         }
 

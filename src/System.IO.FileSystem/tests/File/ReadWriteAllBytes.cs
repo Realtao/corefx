@@ -4,7 +4,7 @@
 using System.Text;
 using Xunit;
 
-namespace System.IO.FileSystem.Tests
+namespace System.IO.Tests
 {
     public class File_ReadWriteAllBytes : FileSystemTest
     {
@@ -104,6 +104,7 @@ namespace System.IO.FileSystem.Tests
             }
         }
 
+        [ActiveIssue(4605, PlatformID.OSX)]
         [Fact]
         public void WriteToReadOnlyFile_UnauthException()
         {

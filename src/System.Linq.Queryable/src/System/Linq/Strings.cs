@@ -18,16 +18,6 @@ namespace System.Linq
             return SR.Format(SR.ArgumentNotValid, message);
         }
 
-        internal static string UnhandledExpressionType(object message)
-        {
-            return SR.Format(SR.UnhandledExpressionType, message);
-        }
-
-        internal static string UnhandledBindingType(object message)
-        {
-            return SR.Format(SR.UnhandledBindingType, message);
-        }
-
         internal static string NoMethodOnType(string name, object type)
         {
             return SR.Format(SR.NoMethodOnType, name, type);
@@ -36,6 +26,11 @@ namespace System.Linq
         internal static string NoMethodOnTypeMatchingArguments(string name, object type)
         {
             return SR.Format(SR.NoMethodOnTypeMatchingArguments, name, type);
+        }
+
+        internal static string EnumeratingNullEnumerableExpression()
+        {
+            return SR.EnumeratingNullEnumerableExpression;
         }
     }
 }

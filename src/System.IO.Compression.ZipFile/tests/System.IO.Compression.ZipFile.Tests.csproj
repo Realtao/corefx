@@ -22,39 +22,27 @@
     <Compile Include="ZipFileTests.cs" />
     <Compile Include="ZipFileInvalidFileTests.cs" />
     <Compile Include="ZipFileReadOpenUpdateTests.cs" />
-    <Compile Include="$(CommonTestPath)\Compression\Utilities\CRC.cs">
-      <Link>Common\Compression\Utilities\CRC.cs</Link>
+    <Compile Include="$(CommonTestPath)\System\IO\Compression\CRC.cs">
+      <Link>Common\System\IO\Compression\CRC.cs</Link>
     </Compile>
-    <Compile Include="$(CommonTestPath)\Compression\Utilities\FileData.cs">
-      <Link>Common\Compression\Utilities\FileData.cs</Link>
+    <Compile Include="$(CommonTestPath)\System\IO\Compression\FileData.cs">
+      <Link>Common\System\IO\Compression\FileData.cs</Link>
     </Compile>
-    <Compile Include="$(CommonTestPath)\Compression\Utilities\LocalMemoryStream.cs">
-      <Link>Common\Compression\Utilities\LocalMemoryStream.cs</Link>
+    <Compile Include="$(CommonTestPath)\System\IO\Compression\LocalMemoryStream.cs">
+      <Link>Common\System\IO\Compression\LocalMemoryStream.cs</Link>
     </Compile>
-    <Compile Include="$(CommonTestPath)\Compression\Utilities\StreamHelpers.cs">
-      <Link>Common\Compression\Utilities\StreamHelpers.cs</Link>
+    <Compile Include="$(CommonTestPath)\System\IO\Compression\StreamHelpers.cs">
+      <Link>Common\System\IO\Compression\StreamHelpers.cs</Link>
     </Compile>
-    <Compile Include="$(CommonTestPath)\Compression\Utilities\ZipTestHelper.cs">
-      <Link>Common\Compression\Utilities\ZipTestHelper.cs</Link>
+    <Compile Include="$(CommonTestPath)\System\IO\Compression\ZipTestHelper.cs">
+      <Link>Common\System\IO\Compression\ZipTestHelper.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />
   </ItemGroup>
+  <ItemGroup>
+    <SupplementalTestData Include="$(PackagesDir)System.IO.Compression.TestData\1.0.0-prerelease\content\**\*.*" />
+  </ItemGroup>
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.targets))\dir.targets" />
-  <!-- Temporary until we have new work in build tools to
-       deploy content from nuget packages -->
-  <Target Name="CopySystemIOCompressionTestDataToTestDirectory" AfterTargets="CopyTestToTestDirectory" Inputs="$(PackagesDir)$(CompressionTestPackage)\content" Outputs="$(TestPath)%(TestTargetFramework.Folder)\*.*">
-    <PropertyGroup>
-      <CompressionTestPackage>System.IO.Compression.TestData\1.0.0-prerelease</CompressionTestPackage>
-      <TestTargetFrameworkFolder>%(TestTargetFramework.Folder)</TestTargetFrameworkFolder>
-    </PropertyGroup>
-    <ItemGroup>
-      <CompressionTestDataSrc Include="$(PackagesDir)$(CompressionTestPackage)\content\**\*.*" />
-      <CompressionTestDataDest Include="@(CompressionTestDataSrc->'$(TestPath)$(TestTargetFrameworkFolder)\%(RecursiveDir)%(Filename)%(Extension)')" />
-    </ItemGroup>
-    <Copy SourceFiles="@(CompressionTestDataSrc)" DestinationFiles="@(CompressionTestDataDest)" SkipUnchangedFiles="$(SkipCopyUnchangedFiles)" OverwriteReadOnlyFiles="$(OverwriteReadOnlyFiles)" Retries="$(CopyRetryCount)" RetryDelayMilliseconds="$(CopyRetryDelayMilliseconds)" UseHardlinksIfPossible="$(CreateHardLinksForCopyFilesToOutputDirectoryIfPossible)">
-      <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
-    </Copy>
-  </Target>
 </Project>

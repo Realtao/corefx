@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using Xunit;
 
-namespace System.IO.FileSystem.Tests
+namespace System.IO.Tests
 {
     public class File_ReadWriteAllLines : FileSystemTest
     {
@@ -96,7 +96,7 @@ namespace System.IO.FileSystem.Tests
             Assert.Throws<FileNotFoundException>(() => Read(path));
         }
 
-
+        [ActiveIssue(4605, PlatformID.OSX)]
         [Fact]
         public void WriteToReadOnlyFile_UnauthException()
         {

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.props))\dir.props" />
   <PropertyGroup>
@@ -10,6 +10,7 @@
     <MinimumVisualStudioVersion>11.0</MinimumVisualStudioVersion>
     <ProjectGuid>{9D6F6254-B5A3-40FF-8925-68AA8D1CE933}</ProjectGuid>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IncludePerformanceTests>true</IncludePerformanceTests>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' " />
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' " />
@@ -30,6 +31,11 @@
     <Compile Include="$(CommonTestPath)\System\IO\FileCleanupTestBase.cs">
       <Link>Common\System\IO\FileCleanupTestBase.cs</Link>
     </Compile>
+    <!-- Performance Tests -->
+    <Compile Include="Performance\Perf.MemoryMappedFile.cs" />
+    <Compile Include="$(CommonTestPath)\System\PerfUtils.cs">
+      <Link>Common\System\PerfUtils.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />
@@ -41,6 +47,14 @@
     <ProjectReference Include="..\src\System.IO.MemoryMappedFiles.csproj">
       <Project>{16EE5522-F387-4C9E-9EF2-B5134B043F37}</Project>
       <Name>System.IO.MemoryMappedFiles</Name>
+    </ProjectReference>
+    <!-- TODO: Temporary workaround.  This PR introduces a change in System.IO.FileSystem to enable SafeFileHandles
+         to be returned from a P/Invoke. Due to how tests are run in CI, this results in a MissingMethodException 
+         when the System.IO.MemoryMappedFiles.Tests are run. The following is a temporary work around and will be removed as 
+         soon as the dlls get in sync. -->
+    <ProjectReference Include="..\..\System.IO.FileSystem\src\System.IO.FileSystem.csproj">
+      <Name>System.IO.FileSystem</Name>
+      <Project>{879C23DC-D828-4DFB-8E92-ABBC11B71035}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.targets))\dir.targets" />

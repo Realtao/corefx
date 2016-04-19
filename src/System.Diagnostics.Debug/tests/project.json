@@ -1,9 +1,8 @@
 {
   "dependencies": {
-    "System.Globalization": "4.0.10",
-    "Microsoft.DotNet.CoreCLR": "1.0.0-prerelease",
-    "xunit": "2.1.0-beta3-*",
-    "xunit.netcore.extensions": "1.0.0-prerelease-*"
+    "Microsoft.TargetingPack.Private.CoreCLR": "1.0.0-rc2-23520",
+    "xunit": "2.1.0",
+    "xunit.netcore.extensions": "1.0.0-prerelease-00123"
   },
   "frameworks": {
     "dnxcore50": {}

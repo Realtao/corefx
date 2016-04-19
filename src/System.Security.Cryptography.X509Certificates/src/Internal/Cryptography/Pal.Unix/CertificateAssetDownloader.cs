@@ -4,12 +4,13 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.Win32.SafeHandles;
 
 namespace Internal.Cryptography.Pal
 {
     internal static class CertificateAssetDownloader
     {
-        private static unsafe Interop.libcurl.curl_unsafe_write_callback s_writeCallback = CurlWriteCallback;
+        private static readonly Interop.Http.ReadWriteCallback s_writeCallback = CurlWriteCallback;
 
         internal static X509Certificate2 DownloadCertificate(string uri, ref TimeSpan remainingDownloadTime)
         {
@@ -30,7 +31,39 @@ namespace Internal.Cryptography.Pal
             }
         }
 
-        internal static unsafe byte[] DownloadAsset(string uri, ref TimeSpan remainingDownloadTime)
+        internal static SafeX509CrlHandle DownloadCrl(string uri, ref TimeSpan remainingDownloadTime)
+        {
+            byte[] data = DownloadAsset(uri, ref remainingDownloadTime);
+
+            if (data == null)
+            {
+                return null;
+            }
+
+            // DER-encoded CRL seems to be the most common off of some random spot-checking, so try DER first.
+            SafeX509CrlHandle handle = Interop.Crypto.DecodeX509Crl(data, data.Length);
+
+            if (!handle.IsInvalid)
+            {
+                return handle;
+            }
+
+            using (SafeBioHandle bio = Interop.Crypto.CreateMemoryBio())
+            {
+                Interop.Crypto.BioWrite(bio, data, data.Length);
+
+                handle = Interop.Crypto.PemReadBioX509Crl(bio);
+
+                if (!handle.IsInvalid)
+                {
+                    return handle;
+                }
+            }
+
+            return null;
+        }
+
+        private static byte[] DownloadAsset(string uri, ref TimeSpan remainingDownloadTime)
         {
             if (remainingDownloadTime <= TimeSpan.Zero)
             {
@@ -39,27 +72,33 @@ namespace Internal.Cryptography.Pal
 
             List<byte[]> dataPieces = new List<byte[]>();
 
-            using (Interop.libcurl.SafeCurlHandle curlHandle = Interop.libcurl.curl_easy_init())
+            using (Interop.Http.SafeCurlHandle curlHandle = Interop.Http.EasyCreate())
             {
                 GCHandle gcHandle = GCHandle.Alloc(dataPieces);
+                Interop.Http.SafeCallbackHandle callbackHandle = new Interop.Http.SafeCallbackHandle();
 
                 try
                 {
+                    Interop.Http.EasySetOptionString(curlHandle, Interop.Http.CURLoption.CURLOPT_URL, uri);
+                    Interop.Http.EasySetOptionLong(curlHandle, Interop.Http.CURLoption.CURLOPT_FOLLOWLOCATION, 1L);
+
                     IntPtr dataHandlePtr = GCHandle.ToIntPtr(gcHandle);
-                    Interop.libcurl.curl_easy_setopt(curlHandle, Interop.libcurl.CURLoption.CURLOPT_URL, uri);
-                    Interop.libcurl.curl_easy_setopt(curlHandle, Interop.libcurl.CURLoption.CURLOPT_WRITEDATA, dataHandlePtr);
-                    Interop.libcurl.curl_easy_setopt(curlHandle, Interop.libcurl.CURLoption.CURLOPT_WRITEFUNCTION, s_writeCallback);
-                    Interop.libcurl.curl_easy_setopt(curlHandle, Interop.libcurl.CURLoption.CURLOPT_FOLLOWLOCATION, 1L);
+                    Interop.Http.RegisterReadWriteCallback(
+                        curlHandle,
+                        Interop.Http.ReadWriteFunction.Write,
+                        s_writeCallback,
+                        dataHandlePtr,
+                        ref callbackHandle);
 
                     Stopwatch stopwatch = Stopwatch.StartNew();
-                    int res = Interop.libcurl.curl_easy_perform(curlHandle);
+                    Interop.Http.CURLcode res = Interop.Http.EasyPerform(curlHandle);
                     stopwatch.Stop();
 
                     // TimeSpan.Zero isn't a worrisome value on the subtraction, it only
                     // means "no limit" on the original input.
                     remainingDownloadTime -= stopwatch.Elapsed;
 
-                    if (res != Interop.libcurl.CURLcode.CURLE_OK)
+                    if (res != Interop.Http.CURLcode.CURLE_OK)
                     {
                         return null;
                     }
@@ -67,6 +106,7 @@ namespace Internal.Cryptography.Pal
                 finally
                 {
                     gcHandle.Free();
+                    callbackHandle.Dispose();
                 }
             }
 
@@ -101,7 +141,7 @@ namespace Internal.Cryptography.Pal
             return data;
         }
 
-        private static unsafe ulong CurlWriteCallback(byte* buffer, ulong size, ulong nitems, IntPtr context)
+        private static ulong CurlWriteCallback(IntPtr buffer, ulong size, ulong nitems, IntPtr context)
         {
             ulong totalSize = size * nitems;
 
@@ -114,7 +154,7 @@ namespace Internal.Cryptography.Pal
             List<byte[]> dataPieces = (List<byte[]>)gcHandle.Target;
             byte[] piece = new byte[totalSize];
 
-            Marshal.Copy((IntPtr)buffer, piece, 0, (int)totalSize);
+            Marshal.Copy(buffer, piece, 0, (int)totalSize);
             dataPieces.Add(piece);
 
             return totalSize;

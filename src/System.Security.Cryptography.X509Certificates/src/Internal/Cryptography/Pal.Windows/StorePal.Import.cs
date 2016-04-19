@@ -21,17 +21,17 @@ namespace Internal.Cryptography.Pal
 {
     internal sealed partial class StorePal : IDisposable, IStorePal
     {
-        public static IStorePal FromBlob(byte[] rawData, String password, X509KeyStorageFlags keyStorageFlags)
+        public static IStorePal FromBlob(byte[] rawData, string password, X509KeyStorageFlags keyStorageFlags)
         {
             return FromBlobOrFile(rawData, null, password, keyStorageFlags);
         }
 
-        public static IStorePal FromFile(String fileName, String password, X509KeyStorageFlags keyStorageFlags)
+        public static IStorePal FromFile(string fileName, string password, X509KeyStorageFlags keyStorageFlags)
         {
             return FromBlobOrFile(null, fileName, password, keyStorageFlags);
         }
 
-        private static StorePal FromBlobOrFile(byte[] rawData, String fileName, String password, X509KeyStorageFlags keyStorageFlags)
+        private static StorePal FromBlobOrFile(byte[] rawData, string fileName, string password, X509KeyStorageFlags keyStorageFlags)
         {
             bool fromFile = fileName != null;
 
@@ -63,7 +63,7 @@ namespace Internal.Cryptography.Pal
                             IntPtr.Zero
                             ))
                         {
-                            throw new CryptographicException(Marshal.GetLastWin32Error());
+                            throw Marshal.GetLastWin32Error().ToCryptographicException();
                         }
 
                         if (contentType == ContentType.CERT_QUERY_CONTENT_PFX)
@@ -79,7 +79,7 @@ namespace Internal.Cryptography.Pal
                                 CRYPTOAPI_BLOB blob2 = new CRYPTOAPI_BLOB(rawData.Length, pRawData2);
                                 certStore = Interop.crypt32.PFXImportCertStore(ref blob2, password, certStoreFlags);
                                 if (certStore == null || certStore.IsInvalid)
-                                    throw new CryptographicException(Marshal.GetLastWin32Error());
+                                    throw Marshal.GetLastWin32Error().ToCryptographicException();
                             }
                         }
 
@@ -91,7 +91,7 @@ namespace Internal.Cryptography.Pal
                             {
                                 CRYPTOAPI_BLOB nullBlob = new CRYPTOAPI_BLOB(0, null);
                                 if (!Interop.crypt32.CertSetCertificateContextProperty(pCertContext, CertContextPropId.CERT_DELETE_KEYSET_PROP_ID, CertSetPropertyFlags.CERT_SET_PROPERTY_INHIBIT_PERSIST_FLAG, &nullBlob))
-                                    throw new CryptographicException(Marshal.GetLastWin32Error());
+                                    throw Marshal.GetLastWin32Error().ToCryptographicException();
                             }
                         }
 
@@ -112,9 +112,9 @@ namespace Internal.Cryptography.Pal
                 CertStoreFlags.CERT_STORE_ENUM_ARCHIVED_FLAG | CertStoreFlags.CERT_STORE_CREATE_NEW_FLAG | CertStoreFlags.CERT_STORE_DEFER_CLOSE_UNTIL_LAST_FREE_FLAG,
                 null);
             if (certStore.IsInvalid)
-                throw new CryptographicException(Marshal.GetHRForLastWin32Error());
+                throw Marshal.GetHRForLastWin32Error().ToCryptographicException();;
             if (!Interop.crypt32.CertAddCertificateContextToStore(certStore, certificatePal.CertContext, CertStoreAddDisposition.CERT_STORE_ADD_ALWAYS, IntPtr.Zero))
-                throw new CryptographicException(Marshal.GetHRForLastWin32Error());
+                throw Marshal.GetHRForLastWin32Error().ToCryptographicException();;
             return new StorePal(certStore);
         }
 
@@ -134,7 +134,7 @@ namespace Internal.Cryptography.Pal
                 CertStoreFlags.CERT_STORE_ENUM_ARCHIVED_FLAG | CertStoreFlags.CERT_STORE_CREATE_NEW_FLAG,
                 null);
             if (certStore.IsInvalid)
-                throw new CryptographicException(Marshal.GetHRForLastWin32Error());
+                throw Marshal.GetHRForLastWin32Error().ToCryptographicException();;
 
             //
             // We use CertAddCertificateLinkToStore to keep a link to the original store, so any property changes get
@@ -145,19 +145,19 @@ namespace Internal.Cryptography.Pal
             {
                 SafeCertContextHandle certContext = Interop.crypt32.CertDuplicateCertificateContext(certificate.Handle);
                 if (!Interop.crypt32.CertAddCertificateLinkToStore(certStore, certContext, CertStoreAddDisposition.CERT_STORE_ADD_ALWAYS, IntPtr.Zero))
-                    throw new CryptographicException(Marshal.GetLastWin32Error());
+                    throw Marshal.GetLastWin32Error().ToCryptographicException();
             }
 
             return new StorePal(certStore);
         }
 
-        public static IStorePal FromSystemStore(String storeName, StoreLocation storeLocation, OpenFlags openFlags)
+        public static IStorePal FromSystemStore(string storeName, StoreLocation storeLocation, OpenFlags openFlags)
         {
             CertStoreFlags certStoreFlags = MapX509StoreFlags(storeLocation, openFlags);
 
             SafeCertStoreHandle certStore = Interop.crypt32.CertOpenStore(CertStoreProvider.CERT_STORE_PROV_SYSTEM_W, CertEncodingType.All, IntPtr.Zero, certStoreFlags, storeName);
             if (certStore.IsInvalid)
-                throw new CryptographicException(Marshal.GetLastWin32Error());
+                throw Marshal.GetLastWin32Error().ToCryptographicException();
 
             //
             // We want the store to auto-resync when requesting a snapshot so that
